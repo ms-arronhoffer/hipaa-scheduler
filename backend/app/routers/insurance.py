@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import Principal
 from app.database import get_db
-from app.guards.deps import phi_log, require_role
+from app.guards.deps import ensure_patient_in_org, phi_log, require_role
 from app.models.activity_log import ActivityLog
 from app.models.patient_records import InsurancePolicy
 from app.schemas.patient_records import InsuranceCreate, InsuranceOut, InsuranceUpdate
@@ -49,6 +49,7 @@ async def list_insurance(
         InsurancePolicy.org_id == p.org_id, InsurancePolicy.deleted_at.is_(None)
     )
     if patient_id is not None:
+        await ensure_patient_in_org(db, patient_id, p.org_id)
         stmt = stmt.where(InsurancePolicy.patient_id == patient_id)
     stmt = stmt.order_by(InsurancePolicy.patient_id, InsurancePolicy.priority)
     return list((await db.execute(stmt)).scalars().all())
@@ -60,6 +61,7 @@ async def create_insurance(
     p: Principal = Depends(require_role("practice_admin", "front_desk", "billing")),
     db: AsyncSession = Depends(get_db),
 ) -> InsurancePolicy:
+    await ensure_patient_in_org(db, body.patient_id, p.org_id)
     if await _priority_conflict(db, org_id=p.org_id, patient_id=body.patient_id, priority=body.priority):
         raise HTTPException(
             status.HTTP_409_CONFLICT,

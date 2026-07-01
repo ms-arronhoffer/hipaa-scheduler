@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import Principal
 from app.database import get_db
-from app.guards.deps import phi_log, require_role
+from app.guards.deps import ensure_patient_in_org, phi_log, require_role
 from app.models.activity_log import ActivityLog
 from app.models.patient_records import Document
 from app.schemas.patient_records import DocumentCreate, DocumentOut
@@ -33,6 +33,7 @@ async def list_documents(
 ) -> list[Document]:
     stmt = select(Document).where(Document.org_id == p.org_id, Document.deleted_at.is_(None))
     if patient_id is not None:
+        await ensure_patient_in_org(db, patient_id, p.org_id)
         stmt = stmt.where(Document.patient_id == patient_id)
     if kind is not None:
         stmt = stmt.where(Document.kind == kind)
@@ -46,6 +47,7 @@ async def create_document(
     p: Principal = Depends(require_role("practice_admin", "front_desk", "provider")),
     db: AsyncSession = Depends(get_db),
 ) -> Document:
+    await ensure_patient_in_org(db, body.patient_id, p.org_id)
     row = Document(
         org_id=p.org_id,
         patient_id=body.patient_id,

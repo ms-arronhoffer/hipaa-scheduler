@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import Principal
 from app.database import get_db
-from app.guards.deps import phi_log, require_role
+from app.guards.deps import ensure_patient_in_org, phi_log, require_role
 from app.models.activity_log import ActivityLog
 from app.models.appointment import Appointment
 from app.models.appointment_type import AppointmentType
@@ -67,6 +67,7 @@ async def create_appointment(
     db: AsyncSession = Depends(get_db),
 ) -> Appointment:
     apptype, _office = await _load_type_and_office(db, p.org_id, body.appointment_type_id, body.office_id)
+    await ensure_patient_in_org(db, body.patient_id, p.org_id)
     end_at = body.start_at + timedelta(minutes=apptype.duration_min)
     try:
         appt = await scheduling_engine.book_appointment(db, scheduling_engine.BookRequest(

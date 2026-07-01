@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import Principal
 from app.database import get_db
-from app.guards.deps import phi_log, require_role
+from app.guards.deps import ensure_patient_in_org, phi_log, require_role
 from app.models.activity_log import ActivityLog
 from app.models.intake_form import IntakeForm, IntakeSubmission
 from app.schemas.intake_form import (
@@ -182,6 +182,7 @@ async def create_submission(
     )).scalar_one_or_none()
     if form is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "form not found")
+    await ensure_patient_in_org(db, body.patient_id, p.org_id)
     _validate_submission(form.schema or {}, body.answers or {})
     row = IntakeSubmission(
         org_id=p.org_id,
@@ -215,6 +216,7 @@ async def list_submissions(
         IntakeSubmission.org_id == p.org_id, IntakeSubmission.deleted_at.is_(None)
     )
     if patient_id is not None:
+        await ensure_patient_in_org(db, patient_id, p.org_id)
         stmt = stmt.where(IntakeSubmission.patient_id == patient_id)
     if form_id is not None:
         stmt = stmt.where(IntakeSubmission.form_id == form_id)

@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import Principal
 from app.database import get_db
-from app.guards.deps import require_role
+from app.guards.deps import ensure_patient_in_org, require_role
 from app.models.notification import (
     NOTIFICATION_CHANNELS,
     NotificationLog,
@@ -119,6 +119,7 @@ async def list_notification_log(
     if status_filter is not None:
         stmt = stmt.where(NotificationLog.status == status_filter)
     if patient_id is not None:
+        await ensure_patient_in_org(db, patient_id, p.org_id)
         stmt = stmt.where(NotificationLog.patient_id == patient_id)
     if appointment_id is not None:
         stmt = stmt.where(NotificationLog.appointment_id == appointment_id)

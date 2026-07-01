@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import Principal
 from app.database import get_db
-from app.guards.deps import phi_log, require_role
+from app.guards.deps import ensure_patient_in_org, phi_log, require_role
 from app.models.activity_log import ActivityLog
 from app.models.waitlist import WAITLIST_STATUSES, WaitlistEntry
 from app.schemas.waitlist import WaitlistCreate, WaitlistOut, WaitlistUpdate
@@ -32,6 +32,7 @@ async def list_waitlist(
     if status_filter is not None:
         stmt = stmt.where(WaitlistEntry.status == status_filter)
     if patient_id is not None:
+        await ensure_patient_in_org(db, patient_id, p.org_id)
         stmt = stmt.where(WaitlistEntry.patient_id == patient_id)
     stmt = stmt.order_by(WaitlistEntry.created_at.desc())
     return list((await db.execute(stmt)).scalars().all())
@@ -45,6 +46,7 @@ async def create_waitlist(
 ) -> WaitlistEntry:
     if body.latest_at <= body.earliest_at:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "latest_at must be after earliest_at")
+    await ensure_patient_in_org(db, body.patient_id, p.org_id)
     row = WaitlistEntry(org_id=p.org_id, **body.model_dump())
     db.add(row)
     await db.flush()
