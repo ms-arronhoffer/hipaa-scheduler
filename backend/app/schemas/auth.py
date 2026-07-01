@@ -10,6 +10,7 @@ class StaffLoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=200)
     totp_code: str | None = Field(default=None, min_length=6, max_length=8)
+    backup_code: str | None = Field(default=None, min_length=8, max_length=64)
 
 
 class TokenResponse(BaseModel):

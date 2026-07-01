@@ -48,7 +48,13 @@ def issue_access(
     return jwt.encode(payload, s.jwt_secret.get_secret_value(), algorithm=ALG)
 
 
-def issue_refresh(*, audience: Audience, subject: uuid.UUID, org_id: uuid.UUID | None) -> str:
+def issue_refresh(
+    *,
+    audience: Audience,
+    subject: uuid.UUID,
+    org_id: uuid.UUID | None,
+    extra: dict[str, Any] | None = None,
+) -> str:
     s = get_settings()
     now = _now()
     payload = {
@@ -61,6 +67,8 @@ def issue_refresh(*, audience: Audience, subject: uuid.UUID, org_id: uuid.UUID |
         "typ": "refresh",
         "jti": uuid.uuid4().hex,
     }
+    if extra:
+        payload.update(extra)
     return jwt.encode(payload, s.jwt_secret.get_secret_value(), algorithm=ALG)
 
 

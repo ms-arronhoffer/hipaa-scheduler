@@ -20,6 +20,7 @@ from app.auth import jwt as jwt_service
 from app.auth import totp as totp_service
 from app.auth.passwords import hash_password, verify_password
 from app.auth.principal import Principal, current_principal
+from app.config import get_settings
 from app.database import get_db
 from app.guards.deps import require_staff
 from app.models.activity_log import ActivityLog
@@ -80,10 +81,19 @@ async def login(body: StaffLoginRequest, request: Request, db: AsyncSession = De
 
     mfa_ok = False
     if user.mfa_enrolled and user.totp_secret:
-        if not body.totp_code or not totp_service.verify(user.totp_secret, body.totp_code):
+        if body.totp_code and totp_service.verify(user.totp_secret, body.totp_code):
+            mfa_ok = True
+        elif body.backup_code:
+            consumed = totp_service.verify_backup_code(
+                body.backup_code, list(user.backup_codes or [])
+            )
+            if consumed is not None:
+                # Single-use: drop the consumed hash so it can't be replayed.
+                user.backup_codes = [h for h in (user.backup_codes or []) if h != consumed]
+                mfa_ok = True
+        if not mfa_ok:
             await _record_attempt(db, email, success=False)
             raise _bad_credentials()
-        mfa_ok = True
     elif not user.mfa_enrolled:
         mfa_ok = False
 
@@ -107,7 +117,9 @@ async def login(body: StaffLoginRequest, request: Request, db: AsyncSession = De
     access = jwt_service.issue_access(
         audience="staff", subject=user.id, org_id=user.org_id, extra={"mfa_ok": mfa_ok}
     )
-    refresh = jwt_service.issue_refresh(audience="staff", subject=user.id, org_id=user.org_id)
+    refresh = jwt_service.issue_refresh(
+        audience="staff", subject=user.id, org_id=user.org_id, extra={"mfa_ok": mfa_ok}
+    )
     return TokenResponse(access_token=access, refresh_token=refresh, expires_in=jwt_service.ACCESS_TTL_MIN * 60)
 
 
@@ -122,8 +134,11 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)) -> T
     import uuid as _uuid
     subj = _uuid.UUID(claims["sub"])
     org = _uuid.UUID(claims["org_id"]) if claims.get("org_id") else None
-    access = jwt_service.issue_access(audience="staff", subject=subj, org_id=org, extra={"mfa_ok": False})
-    new_refresh = jwt_service.issue_refresh(audience="staff", subject=subj, org_id=org)
+    mfa_ok = bool(claims.get("mfa_ok", False))
+    access = jwt_service.issue_access(audience="staff", subject=subj, org_id=org, extra={"mfa_ok": mfa_ok})
+    new_refresh = jwt_service.issue_refresh(
+        audience="staff", subject=subj, org_id=org, extra={"mfa_ok": mfa_ok}
+    )
     return TokenResponse(access_token=access, refresh_token=new_refresh, expires_in=jwt_service.ACCESS_TTL_MIN * 60)
 
 
@@ -133,7 +148,12 @@ async def mfa_start(p: Principal = Depends(require_staff()), db: AsyncSession = 
     secret = totp_service.new_secret()
     user.totp_secret = secret
     await db.flush()
-    return MfaEnrollStart(secret=secret, provisioning_uri=totp_service.provisioning_uri(secret, user.email))
+    return MfaEnrollStart(
+        secret=secret,
+        provisioning_uri=totp_service.provisioning_uri(
+            secret, user.email, issuer=get_settings().jwt_issuer
+        ),
+    )
 
 
 @router.post("/mfa/enroll/verify", response_model=MfaBackupCodes)
