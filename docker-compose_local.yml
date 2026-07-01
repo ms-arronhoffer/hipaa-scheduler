@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hipaa_scheduler}
+      POSTGRES_USER: ${POSTGRES_USER:-hs_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hs_admin} -d ${POSTGRES_DB:-hipaa_scheduler}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-hs_admin}:${POSTGRES_PASSWORD:-devpass}@postgres:5432/${POSTGRES_DB:-hipaa_scheduler}
+      APP_ENV: development
+      LOG_LEVEL: DEBUG
+      LOG_FORMAT: text
+      JWT_SECRET: local-dev-jwt-secret-not-for-production-use-only
+      JWT_ISSUER: hipaa-scheduler-local
+      SESSION_IDLE_MIN: 60
+      MFA_REQUIRED_DEFAULT: "false"
+      DEFAULT_ADMIN_EMAIL: admin@local.test
+      DEFAULT_ADMIN_PASSWORD: LocalAdminPass123!
+      SUPER_ADMIN_EMAILS: admin@local.test
+      FRONTEND_URL: http://localhost:5173
+      ADMIN_URL: http://localhost:5174
+      PATIENT_URL: http://localhost:5175
+      PHI_AUDIT_ENABLED: "true"
+      RETENTION_YEARS: 6
+      EMAIL_FROM: dev@local.test
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "worker.py"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-hs_admin}:${POSTGRES_PASSWORD:-devpass}@postgres:5432/${POSTGRES_DB:-hipaa_scheduler}
+      APP_ENV: development
+      LOG_LEVEL: DEBUG
+      LOG_FORMAT: text
+      JWT_SECRET: local-dev-jwt-secret-not-for-production-use-only
+      DEFAULT_ADMIN_PASSWORD: LocalAdminPass123!
+    volumes:
+      - ./backend:/app
+
+volumes:
+  pgdata_local:

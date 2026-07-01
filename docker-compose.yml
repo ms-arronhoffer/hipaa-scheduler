@@ -1,0 +1,141 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hipaa_scheduler}
+      POSTGRES_USER: ${POSTGRES_USER:-hs_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hs_admin} -d ${POSTGRES_DB:-hipaa_scheduler}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  backend:
+    build: ./backend
+    image: hipaa-scheduler-backend:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment: &backend_env
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-hs_admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hipaa_scheduler}
+      APP_ENV: ${APP_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ISSUER: ${JWT_ISSUER:-hipaa-scheduler}
+      SESSION_IDLE_MIN: ${SESSION_IDLE_MIN:-15}
+      MFA_REQUIRED_DEFAULT: ${MFA_REQUIRED_DEFAULT:-true}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:-admin@example.com}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:?DEFAULT_ADMIN_PASSWORD is required}
+      SUPER_ADMIN_EMAILS: ${SUPER_ADMIN_EMAILS:-}
+      FRONTEND_URL: ${FRONTEND_URL:-https://localhost}
+      ADMIN_URL: ${ADMIN_URL:-https://localhost:4001}
+      PATIENT_URL: ${PATIENT_URL:-https://localhost:4002}
+      RATE_LIMIT_DEFAULT: ${RATE_LIMIT_DEFAULT:-100/minute}
+      RATE_LIMIT_AUTH: ${RATE_LIMIT_AUTH:-10/minute}
+      RATE_LIMIT_PUBLIC_BOOKING: ${RATE_LIMIT_PUBLIC_BOOKING:-30/minute}
+      PHI_AUDIT_ENABLED: ${PHI_AUDIT_ENABLED:-true}
+      RETENTION_YEARS: ${RETENTION_YEARS:-6}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@example.com}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Practice Scheduler}
+      TWILIO_SID: ${TWILIO_SID:-}
+      TWILIO_TOKEN: ${TWILIO_TOKEN:-}
+      TWILIO_FROM: ${TWILIO_FROM:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_REGION: ${S3_REGION:-}
+      GOOGLE_OAUTH_ID: ${GOOGLE_OAUTH_ID:-}
+      GOOGLE_OAUTH_SECRET: ${GOOGLE_OAUTH_SECRET:-}
+      MS_OAUTH_ID: ${MS_OAUTH_ID:-}
+      MS_OAUTH_SECRET: ${MS_OAUTH_SECRET:-}
+      WEBHOOK_HMAC_ALG: ${WEBHOOK_HMAC_ALG:-sha256}
+      WEBHOOK_TIMEOUT_SEC: ${WEBHOOK_TIMEOUT_SEC:-5}
+      WEBHOOK_MAX_ATTEMPTS: ${WEBHOOK_MAX_ATTEMPTS:-6}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/readyz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - internal
+
+  worker:
+    build: ./backend
+    image: hipaa-scheduler-backend:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    command: ["python", "worker.py"]
+    environment: *backend_env
+    networks:
+      - internal
+
+  frontend:
+    build: ./frontend
+    image: hipaa-scheduler-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - internal
+
+  admin-frontend:
+    build: ./admin-frontend
+    image: hipaa-scheduler-admin-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - internal
+
+  patient-portal:
+    build: ./patient-portal
+    image: hipaa-scheduler-patient-portal:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+      - admin-frontend
+      - patient-portal
+    ports:
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pgdata:
+  nginx_logs:
