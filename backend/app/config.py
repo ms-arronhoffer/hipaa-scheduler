@@ -24,6 +24,10 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str
+    # Run `alembic upgrade head` on backend startup (start.py) so a freshly
+    # provisioned stack has its schema before the app serves. Disable to manage
+    # migrations out-of-band.
+    run_migrations_on_startup: bool = True
 
     # Auth (secrets — no defaults)
     jwt_secret: SecretStr

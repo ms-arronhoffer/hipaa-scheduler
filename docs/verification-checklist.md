@@ -41,7 +41,11 @@ credentials.
 
 ## 3. Migration + seed
 
-- [ ] `docker compose exec backend alembic upgrade head` → runs `001_initial`.
+- [ ] Migrations run automatically on backend startup (`RUN_MIGRATIONS_ON_STARTUP=true`,
+      the default). To run them manually instead:
+      `docker compose exec backend alembic upgrade head` → runs `001_initial`.
+- [ ] Confirm the first-run super-admin was seeded from `DEFAULT_ADMIN_EMAIL` /
+      `DEFAULT_ADMIN_PASSWORD` (see `app/bootstrap.py`) and can log in.
 - [ ] Assert the exclusion constraint exists:
       ```
       docker compose exec postgres psql -U hs_admin -d hipaa_scheduler -c \
