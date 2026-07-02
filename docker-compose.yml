@@ -19,6 +19,7 @@ services:
   backend:
     build: ./backend
     image: hipaa-scheduler-backend:latest
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       postgres:
@@ -74,6 +75,7 @@ services:
   worker:
     build: ./backend
     image: hipaa-scheduler-backend:latest
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       postgres:
@@ -88,6 +90,7 @@ services:
   frontend:
     build: ./frontend
     image: hipaa-scheduler-frontend:latest
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       - backend
@@ -97,6 +100,7 @@ services:
   admin-frontend:
     build: ./admin-frontend
     image: hipaa-scheduler-admin-frontend:latest
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       - backend
@@ -106,6 +110,7 @@ services:
   patient-portal:
     build: ./patient-portal
     image: hipaa-scheduler-patient-portal:latest
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       - backend
