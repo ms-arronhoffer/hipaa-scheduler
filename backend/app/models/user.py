@@ -10,6 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, OrgScoped, SoftDeleteMixin, TimestampMixin, UUIDPk
+from app.models.types import EncryptedString
 
 
 class User(Base, UUIDPk, OrgScoped, TimestampMixin, SoftDeleteMixin):
@@ -24,7 +25,7 @@ class User(Base, UUIDPk, OrgScoped, TimestampMixin, SoftDeleteMixin):
     last_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     roles: Mapped[list[str]] = mapped_column(ARRAY(String(30)), default=list, nullable=False)
     is_super_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_secret: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     mfa_enrolled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     backup_codes: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

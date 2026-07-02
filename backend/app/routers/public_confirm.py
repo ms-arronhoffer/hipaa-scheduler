@@ -24,6 +24,8 @@ router = APIRouter(prefix="/pub", tags=["public_confirm"])
 
 
 async def _load_appointment(db: AsyncSession, appointment_id) -> Appointment:
+    # idor-safe: appointment_id is unwrapped from a signed confirm token (see
+    # confirm_token_service); the public confirm flow has no authenticated org.
     row = (await db.execute(
         select(Appointment).where(
             Appointment.id == appointment_id,

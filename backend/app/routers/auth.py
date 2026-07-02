@@ -144,6 +144,7 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)) -> T
 
 @router.post("/mfa/enroll/start", response_model=MfaEnrollStart)
 async def mfa_start(p: Principal = Depends(require_staff()), db: AsyncSession = Depends(get_db)) -> MfaEnrollStart:
+    # idor-safe: scoped to the authenticated staff principal's own id (from JWT), not org.
     user = (await db.execute(select(User).where(User.id == p.subject_id))).scalar_one()
     secret = totp_service.new_secret()
     user.totp_secret = secret
@@ -162,6 +163,7 @@ async def mfa_verify(
     p: Principal = Depends(require_staff()),
     db: AsyncSession = Depends(get_db),
 ) -> MfaBackupCodes:
+    # idor-safe: scoped to the authenticated staff principal's own id (from JWT), not org.
     user = (await db.execute(select(User).where(User.id == p.subject_id))).scalar_one()
     if not user.totp_secret or not totp_service.verify(user.totp_secret, body.totp_code):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid code")
