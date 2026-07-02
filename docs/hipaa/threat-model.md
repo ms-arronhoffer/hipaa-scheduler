@@ -49,8 +49,10 @@ where `{id}` belongs to Org B.
   filtering is the only line of defense.
 
 **Residual risk.** A missing `.where(Model.org_id == p.org_id)` clause in a
-new query would leak. Mitigation: PR review checklist item, plus a
-`pyright`-level custom rule (not yet built — tracked in `docs/hipaa/backlog.md`).
+new query would leak. Mitigation: PR review checklist item, plus a static
+check (`backend/tools/idor_lint.py`, run in the test suite) that flags any
+`select(<OrgScoped model>)` without an `org_id` predicate or an explicit
+`# idor-safe` justification — see `docs/hipaa/backlog.md`.
 
 ### T2 — Patient JWT used against staff endpoints (E/I)
 

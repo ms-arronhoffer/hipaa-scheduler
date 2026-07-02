@@ -180,8 +180,9 @@ curl -skI https://portal.localhost/  | grep -Ei 'strict-transport|content-securi
 
 ## What is intentionally NOT in this checklist
 
-- **Load / stress testing.** `docs/hipaa/backlog.md` tracks this — locust
-  on `/pub/availability` is planned, not blocking for v1.
+- **Load / stress testing.** Not a pass/fail gate for v1, but a Locust profile
+  now exists (`backend/tests/load/`, run manually) to establish guest-booking
+  capacity — see `docs/hipaa/backlog.md`.
 - **Full accessibility audit.** Cloudscape gives us WCAG 2.1 AA baseline;
   a full audit is post-v1.
 - **Cross-browser matrix beyond Chromium + Firefox.** Safari + Edge before v1.1.
