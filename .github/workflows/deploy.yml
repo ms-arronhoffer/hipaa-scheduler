@@ -1,0 +1,43 @@
+name: deploy
+
+# Deploys the HIPAA Scheduler stack to the HIPAA-compliant VM. Runs on a
+# self-hosted runner (which lives inside the trusted network with access to the
+# deployment host) whenever code is pushed to the main branch. Also exposed via
+# workflow_dispatch for manual redeploys.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy with Docker Compose
+        run: |
+          docker compose pull
+          docker compose up -d --build --remove-orphans
+
+      - name: Wait for backend health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsk https://localhost/api/v1/readyz; then
+              echo "Backend healthy"
+              exit 0
+            fi
+            echo "Waiting for backend to become healthy ($i/30)..."
+            sleep 5
+          done
+          echo "Backend did not become healthy in time" >&2
+          exit 1
