@@ -6,7 +6,7 @@ variables only — PHI (name, dob, MRN) is never interpolated into subject/body.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -15,11 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.principal import Principal
 from app.database import get_db
 from app.guards.deps import ensure_patient_in_org, require_role
+from app.models.activity_log import ActivityLog
 from app.models.notification import (
     NOTIFICATION_CHANNELS,
     NotificationLog,
     NotificationTemplate,
 )
+from app.models.patient import Patient
+from app.schemas.common import ORMModel
 from app.schemas.notification import (
     NotificationLogOut,
     TemplateCreate,
@@ -101,6 +104,52 @@ async def delete_template(
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND)
     row.deleted_at = datetime.utcnow()
+
+
+class SMSConsentOut(ORMModel):
+    patient_id: uuid.UUID
+    sms_opt_in_at: datetime | None
+
+
+@router.post("/sms/opt-in/{patient_id}", response_model=SMSConsentOut)
+async def sms_opt_in(
+    patient_id: uuid.UUID,
+    p: Principal = Depends(require_role("practice_admin", "front_desk", "provider")),
+    db: AsyncSession = Depends(get_db),
+) -> SMSConsentOut:
+    """Record affirmative SMS consent for a patient (double opt-in confirmation)."""
+    await ensure_patient_in_org(db, patient_id, p.org_id)
+    patient = (await db.execute(
+        select(Patient).where(Patient.id == patient_id, Patient.org_id == p.org_id)
+    )).scalar_one()
+    if patient.sms_opt_in_at is None:
+        patient.sms_opt_in_at = datetime.now(timezone.utc)
+    db.add(ActivityLog(
+        org_id=p.org_id, actor_type="user", actor_id=p.subject_id, actor_email=p.email,
+        entity_type="patient", entity_id=patient_id, action="sms_opt_in",
+        changes={"sms_opt_in_at": patient.sms_opt_in_at.isoformat()},
+    ))
+    return SMSConsentOut(patient_id=patient_id, sms_opt_in_at=patient.sms_opt_in_at)
+
+
+@router.post("/sms/opt-out/{patient_id}", response_model=SMSConsentOut)
+async def sms_opt_out(
+    patient_id: uuid.UUID,
+    p: Principal = Depends(require_role("practice_admin", "front_desk", "provider")),
+    db: AsyncSession = Depends(get_db),
+) -> SMSConsentOut:
+    """Revoke SMS consent for a patient (clears the opt-in timestamp)."""
+    await ensure_patient_in_org(db, patient_id, p.org_id)
+    patient = (await db.execute(
+        select(Patient).where(Patient.id == patient_id, Patient.org_id == p.org_id)
+    )).scalar_one()
+    patient.sms_opt_in_at = None
+    db.add(ActivityLog(
+        org_id=p.org_id, actor_type="user", actor_id=p.subject_id, actor_email=p.email,
+        entity_type="patient", entity_id=patient_id, action="sms_opt_out",
+        changes={},
+    ))
+    return SMSConsentOut(patient_id=patient_id, sms_opt_in_at=None)
 
 
 @router.get("/log", response_model=list[NotificationLogOut])

@@ -3,6 +3,7 @@
 Runs periodic background jobs:
 - reminder_sweep: enqueue email/SMS reminders based on ReminderRule offsets
 - webhook_retry: retry failed WebhookDelivery rows with backoff
+- notification_retry: retry failed email/SMS NotificationLog rows with backoff
 - waitlist_fill: on cancellation events, notify next waitlist entries
 - retention_sweep: soft-delete rows past HIPAA 6-year retention floor
 - calendar_pull: incremental sync from connected Google/O365 calendars
@@ -29,6 +30,10 @@ async def main() -> None:
     # Webhook retry every 1 minute
     from app.tasks.webhook_retry import run_webhook_retry
     scheduler.add_job(run_webhook_retry, "interval", minutes=1, id="webhook_retry")
+
+    # Notification (email/SMS) delivery retry every 2 minutes
+    from app.tasks.notification_retry import run_notification_retry
+    scheduler.add_job(run_notification_retry, "interval", minutes=2, id="notification_retry")
 
     # Retention sweep nightly at 03:15 UTC
     from app.tasks.retention_sweep import run_retention_sweep

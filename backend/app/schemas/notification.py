@@ -71,5 +71,7 @@ class NotificationLogOut(ORMModel):
     status: str
     error: str | None
     sent_at: datetime | None
+    attempts: int
+    next_retry_at: datetime | None
     context: dict
     created_at: datetime

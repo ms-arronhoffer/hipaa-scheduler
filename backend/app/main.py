@@ -107,6 +107,7 @@ from app.routers import (
     providers,
     public_booking,
     public_confirm,
+    public_sms,
     reminders,
     reports,
     timeoff,
@@ -161,6 +162,7 @@ app.include_router(calendar_sync.router, prefix=API_V1)
 # Public (unauthenticated) surfaces
 app.include_router(public_booking.router, prefix=API_V1)
 app.include_router(public_confirm.router, prefix=API_V1)
+app.include_router(public_sms.router, prefix=API_V1)
 
 # Super-admin
 app.include_router(admin_tenants.router, prefix=API_V1)

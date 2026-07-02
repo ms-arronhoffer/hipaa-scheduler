@@ -53,4 +53,9 @@ class NotificationLog(Base, UUIDPk, OrgScoped, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), default="queued", nullable=False)
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Delivery-failure retry with backoff. `attempts` counts send tries;
+    # `next_retry_at` is when a failed row becomes eligible for the retry sweep
+    # (NULL once succeeded or permanently exhausted).
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     context: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)  # non-PHI metadata only

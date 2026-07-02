@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     webhook_timeout_sec: int = 5
     webhook_max_attempts: int = 6
 
+    # Notification delivery retry (email/SMS). A failed send is re-attempted by
+    # the notification retry sweep with the backoff schedule below (minutes);
+    # once `notification_max_attempts` is reached the row stays `failed`.
+    notification_max_attempts: int = 4
+    notification_retry_delays_min: list[int] = [1, 5, 30, 120]
+
     # Observability
     sentry_dsn: str | None = None
 

@@ -6,6 +6,9 @@ handling is done at the router layer (Twilio inbound webhook) which flips
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import logging
 
 import httpx
@@ -55,3 +58,27 @@ def parse_inbound_keyword(body: str) -> str | None:
     if b in {"YES", "Y", "OPT IN"}:
         return "confirm"
     return None
+
+
+def verify_twilio_signature(url: str, params: dict[str, str], signature: str | None) -> bool:
+    """Validate Twilio's ``X-Twilio-Signature`` header (HMAC-SHA1).
+
+    Twilio signs the full request URL concatenated with each POST field's name
+    and value, sorted by field name. See
+    https://www.twilio.com/docs/usage/security#validating-requests.
+
+    Fails closed: returns ``False`` when the auth token or signature is missing.
+    """
+    token = settings.twilio_token
+    if not token or not signature:
+        return False
+    data = url
+    for key in sorted(params):
+        data += key + (params[key] or "")
+    digest = hmac.new(
+        token.get_secret_value().encode("utf-8"),
+        data.encode("utf-8"),
+        hashlib.sha1,  # noqa: S324 - required by the Twilio signing protocol
+    ).digest()
+    expected = base64.b64encode(digest).decode("ascii")
+    return hmac.compare_digest(expected, signature)
