@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # HIPAA
     phi_audit_enabled: bool = True
     retention_years: int = 6
+    # Application-layer encryption key for ePHI at rest (secret — no default).
+    # Dedicated key, NOT reused from jwt_secret, so the two can rotate
+    # independently. May be a comma-separated list for key rotation: the first
+    # entry encrypts, all entries are accepted for decryption. See
+    # app/utils/crypto.py.
+    phi_encryption_key: SecretStr
 
     # Notifications
     sendgrid_api_key: SecretStr | None = None

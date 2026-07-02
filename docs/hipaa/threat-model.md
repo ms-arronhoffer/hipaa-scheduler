@@ -30,7 +30,8 @@ re-analyzed.
 - JWT signing key (`JWT_SECRET`)
 - Backup encryption key (age recipient key)
 - OAuth refresh tokens for calendar sync (encrypted at rest via
-  application-layer key derived from `JWT_SECRET`)
+  application-layer `EncryptedString` keyed on the dedicated
+  `PHI_ENCRYPTION_KEY`, independent of `JWT_SECRET`)
 
 ## Threats
 

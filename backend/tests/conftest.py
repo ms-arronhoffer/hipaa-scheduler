@@ -18,6 +18,15 @@ from collections.abc import AsyncIterator
 
 import pytest
 
+# Ensure required secrets have test defaults before any test module imports
+# app.config (which validates env on import). Individual test modules also set
+# these via os.environ.setdefault; doing it here as well guarantees any test
+# that touches config — including the PHI crypto path — can boot.
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://x/x")
+os.environ.setdefault("JWT_SECRET", "test-secret-please-ignore-32-bytes-min")
+os.environ.setdefault("DEFAULT_ADMIN_PASSWORD", "test-admin-pw")
+os.environ.setdefault("PHI_ENCRYPTION_KEY", "test-phi-key-please-ignore-32-bytes-min")
+
 
 def pytest_collection_modifyitems(config, items):
     """Skip integration tests unless -m integration explicitly requested."""

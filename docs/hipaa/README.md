@@ -13,6 +13,8 @@ changes the underlying system behavior.
   moves, or gets displayed. Required by §164.308(a)(1)(ii)(A).
 - **[threat-model.md](threat-model.md)** — STRIDE model with controls
   and residual risks. Reviewed every minor version.
+- **[backlog.md](backlog.md)** — Tracked, non-blocking security/HIPAA
+  follow-up work (deferred encryption of indexed PHI, IDOR lint, load tests).
 - **runbooks/**
   - **[incident-response.md](runbooks/incident-response.md)** — What to
     do when an incident is declared. §164.404 notification obligations.
