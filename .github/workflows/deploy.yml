@@ -25,9 +25,19 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy with Docker Compose
+        # The repo is checked out into the ephemeral runner workspace, but the
+        # deployment secrets live in a persistent .env on the host (the same
+        # directory backup.sh runs from). Point Compose at it with --env-file so
+        # variable interpolation (POSTGRES_PASSWORD, JWT_SECRET, ...) resolves.
+        env:
+          ENV_FILE: ${{ vars.DEPLOY_ENV_FILE || '/opt/hipaa-scheduler/.env' }}
         run: |
-          docker compose pull
-          docker compose up -d --build --remove-orphans
+          if [[ ! -f "$ENV_FILE" ]]; then
+            echo "Deploy env file not found at $ENV_FILE" >&2
+            exit 1
+          fi
+          docker compose --env-file "$ENV_FILE" pull
+          docker compose --env-file "$ENV_FILE" up -d --build --remove-orphans
 
       - name: Wait for backend health
         run: |
