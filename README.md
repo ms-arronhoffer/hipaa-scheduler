@@ -22,6 +22,16 @@ docker compose -f docker-compose_local.yml up -d
 - Backend API: https://localhost/api/v1/
 - Health: https://localhost/api/v1/readyz
 
+### First login
+
+On first boot the backend applies migrations and **bootstraps a super-admin**
+from `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` (see `app/bootstrap.py`).
+Log in to the admin portal with those credentials, then provision tenants and
+practice-admins from there. The bootstrap is idempotent and never overwrites an
+existing account's password, so rotate the seed password after first login.
+Additional platform operators can be pre-authorized by listing their emails in
+`SUPER_ADMIN_EMAILS`; matching users are promoted to super-admin on startup.
+
 ## HIPAA controls
 
 - Every PHI access logged to `ActivityLog` with `phi_accessed=true` (see `docs/hipaa/ephi-inventory.md`)

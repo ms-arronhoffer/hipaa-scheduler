@@ -47,6 +47,7 @@ services:
       PHI_AUDIT_ENABLED: "true"
       RETENTION_YEARS: 6
       EMAIL_FROM: dev@local.test
+      PHI_ENCRYPTION_KEY: local-dev-dedicated-phi-key-not-for-production-min-32
     ports:
       - "8000:8000"
     volumes:
@@ -66,6 +67,7 @@ services:
       LOG_FORMAT: text
       JWT_SECRET: local-dev-jwt-secret-not-for-production-use-only
       DEFAULT_ADMIN_PASSWORD: LocalAdminPass123!
+      PHI_ENCRYPTION_KEY: local-dev-dedicated-phi-key-not-for-production-min-32
     volumes:
       - ./backend:/app
 

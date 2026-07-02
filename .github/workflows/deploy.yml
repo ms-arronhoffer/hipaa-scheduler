@@ -40,9 +40,15 @@ jobs:
           docker compose --env-file "$ENV_FILE" up -d --build --remove-orphans
 
       - name: Wait for backend health
+        env:
+          ENV_FILE: ${{ vars.DEPLOY_ENV_FILE || '/opt/hipaa-scheduler/.env' }}
         run: |
+          # Resolve the published HTTPS host port from the deploy env file so
+          # this gate follows HTTPS_PORT (defaults to 5443, matching compose).
+          HTTPS_PORT="$(grep -E '^HTTPS_PORT=' "$ENV_FILE" | tail -1 | cut -d= -f2 | tr -d '[:space:]')"
+          HTTPS_PORT="${HTTPS_PORT:-5443}"
           for i in $(seq 1 30); do
-            if curl -fsk https://localhost/api/v1/readyz; then
+            if curl -fsk "https://localhost:${HTTPS_PORT}/api/v1/readyz"; then
               echo "Backend healthy"
               exit 0
             fi

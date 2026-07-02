@@ -16,6 +16,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import engine
+from app.bootstrap import bootstrap_super_admin
 from app.utils.logging import configure_logging
 from app.utils.phi_scrub import sentry_before_send
 
@@ -36,6 +37,7 @@ async def lifespan(_app: FastAPI):
             send_default_pii=False,
         )
     logger.info("app.startup", extra={"env": settings.app_env})
+    await bootstrap_super_admin()
     yield
     await engine.dispose()
     logger.info("app.shutdown")
