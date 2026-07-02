@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, OrgScoped, SoftDeleteMixin, TimestampMixin, UUIDPk
+from app.models.types import EncryptedString
 
 
 CONSENT_KINDS = ("hipaa_privacy", "telehealth", "sms", "financial", "custom")
@@ -54,8 +55,8 @@ class InsurancePolicy(Base, UUIDPk, OrgScoped, TimestampMixin, SoftDeleteMixin):
     priority: Mapped[int] = mapped_column(Integer, default=1, nullable=False)  # 1=primary, 2=secondary
     carrier: Mapped[str] = mapped_column(String(120), nullable=False)
     plan_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    member_id: Mapped[str] = mapped_column(String(60), nullable=False)
-    group_number: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    member_id: Mapped[str] = mapped_column(EncryptedString, nullable=False)  # PHI — encrypted at rest
+    group_number: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)  # PHI — encrypted at rest
     subscriber_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     subscriber_dob: Mapped[date | None] = mapped_column(Date, nullable=True)
     subscriber_relation: Mapped[str | None] = mapped_column(String(20), nullable=True)

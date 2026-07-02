@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # HIPAA
     phi_audit_enabled: bool = True
     retention_years: int = 6
+    # Application-layer encryption key for ePHI at rest (secret — no default).
+    # Dedicated key, NOT reused from jwt_secret, so the two can rotate
+    # independently. May be a comma-separated list for key rotation: the first
+    # entry encrypts, all entries are accepted for decryption. See
+    # app/utils/crypto.py.
+    phi_encryption_key: SecretStr
 
     # Notifications
     sendgrid_api_key: SecretStr | None = None
@@ -67,14 +73,44 @@ class Settings(BaseSettings):
     google_oauth_secret: SecretStr | None = None
     ms_oauth_id: str | None = None
     ms_oauth_secret: SecretStr | None = None
+    # OAuth redirect (callback) URIs registered with each provider. When unset
+    # they are derived from `frontend_url` + the callback route. They MUST be
+    # publicly reachable and match the provider console's allow-list exactly.
+    google_oauth_redirect_uri: str | None = None
+    ms_oauth_redirect_uri: str | None = None
+    # After a successful OAuth callback the browser is redirected here (staff
+    # calendar-settings page). `?calendar=<connected|error>` is appended.
+    calendar_oauth_success_path: str = "/settings/integrations"
+    # Forward window (days) the reconcile pass mirrors appointments into the
+    # connected calendar. Past events and events beyond the window are ignored.
+    calendar_sync_window_days: int = 30
 
     # Webhooks
     webhook_hmac_alg: str = "sha256"
     webhook_timeout_sec: int = 5
     webhook_max_attempts: int = 6
 
+    # Notification delivery retry (email/SMS). A failed send is re-attempted by
+    # the notification retry sweep with the backoff schedule below (minutes);
+    # once `notification_max_attempts` is reached the row stays `failed`.
+    notification_max_attempts: int = 4
+    notification_retry_delays_min: list[int] = [1, 5, 30, 120]
+
     # Observability
     sentry_dsn: str | None = None
+
+    # Background worker liveness. The worker writes a heartbeat file after each
+    # scheduler tick; the API `/worker/health` probe reads it and reports stale
+    # if it hasn't been updated within `worker_heartbeat_max_age_sec`.
+    worker_heartbeat_path: str = "/tmp/hs_worker_heartbeat.json"
+    worker_heartbeat_max_age_sec: int = 900
+
+    # Password policy & lifecycle
+    password_min_length: int = 12
+    password_expiry_days: int = 90  # 0 disables expiry
+    password_history_depth: int = 5  # remembered hashes to block reuse; 0 disables
+    password_hibp_enabled: bool = True  # k-anonymity breach check (pwnedpasswords.com)
+    password_reset_ttl_min: int = 30
 
     @computed_field  # type: ignore[misc]
     @property

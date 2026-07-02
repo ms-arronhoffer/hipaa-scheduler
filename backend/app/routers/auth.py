@@ -20,14 +20,20 @@ from app.auth import jwt as jwt_service
 from app.auth import totp as totp_service
 from app.auth.passwords import hash_password, verify_password
 from app.auth.principal import Principal, current_principal
+from app.auth import password_policy
+from app.config import get_settings
 from app.database import get_db
 from app.guards.deps import require_staff
 from app.models.activity_log import ActivityLog
 from app.models.user import AuthLockout, User
+from app.services import email_service, password_service
 from app.schemas.auth import (
     MfaBackupCodes,
     MfaEnrollStart,
     MfaEnrollVerify,
+    PasswordChangeRequest,
+    PasswordForgotRequest,
+    PasswordResetRequest,
     RefreshRequest,
     StaffLoginRequest,
     TokenResponse,
@@ -80,15 +86,32 @@ async def login(body: StaffLoginRequest, request: Request, db: AsyncSession = De
 
     mfa_ok = False
     if user.mfa_enrolled and user.totp_secret:
-        if not body.totp_code or not totp_service.verify(user.totp_secret, body.totp_code):
+        if body.totp_code and totp_service.verify(user.totp_secret, body.totp_code):
+            mfa_ok = True
+        elif body.backup_code:
+            consumed = totp_service.verify_backup_code(
+                body.backup_code, list(user.backup_codes or [])
+            )
+            if consumed is not None:
+                # Single-use: drop the consumed hash so it can't be replayed.
+                user.backup_codes = [h for h in (user.backup_codes or []) if h != consumed]
+                mfa_ok = True
+        if not mfa_ok:
             await _record_attempt(db, email, success=False)
             raise _bad_credentials()
-        mfa_ok = True
     elif not user.mfa_enrolled:
         mfa_ok = False
 
     await _record_attempt(db, email, success=True)
     user.last_login_at = datetime.utcnow()
+
+    # Expired password: authentication succeeded but the credential is stale.
+    # Block token issuance and steer the user to the reset flow.
+    if password_service.is_expired(user):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "password expired — reset required",
+        )
 
     db.add(ActivityLog(
         org_id=user.org_id,
@@ -107,7 +130,9 @@ async def login(body: StaffLoginRequest, request: Request, db: AsyncSession = De
     access = jwt_service.issue_access(
         audience="staff", subject=user.id, org_id=user.org_id, extra={"mfa_ok": mfa_ok}
     )
-    refresh = jwt_service.issue_refresh(audience="staff", subject=user.id, org_id=user.org_id)
+    refresh = jwt_service.issue_refresh(
+        audience="staff", subject=user.id, org_id=user.org_id, extra={"mfa_ok": mfa_ok}
+    )
     return TokenResponse(access_token=access, refresh_token=refresh, expires_in=jwt_service.ACCESS_TTL_MIN * 60)
 
 
@@ -122,18 +147,27 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)) -> T
     import uuid as _uuid
     subj = _uuid.UUID(claims["sub"])
     org = _uuid.UUID(claims["org_id"]) if claims.get("org_id") else None
-    access = jwt_service.issue_access(audience="staff", subject=subj, org_id=org, extra={"mfa_ok": False})
-    new_refresh = jwt_service.issue_refresh(audience="staff", subject=subj, org_id=org)
+    mfa_ok = bool(claims.get("mfa_ok", False))
+    access = jwt_service.issue_access(audience="staff", subject=subj, org_id=org, extra={"mfa_ok": mfa_ok})
+    new_refresh = jwt_service.issue_refresh(
+        audience="staff", subject=subj, org_id=org, extra={"mfa_ok": mfa_ok}
+    )
     return TokenResponse(access_token=access, refresh_token=new_refresh, expires_in=jwt_service.ACCESS_TTL_MIN * 60)
 
 
 @router.post("/mfa/enroll/start", response_model=MfaEnrollStart)
 async def mfa_start(p: Principal = Depends(require_staff()), db: AsyncSession = Depends(get_db)) -> MfaEnrollStart:
+    # idor-safe: scoped to the authenticated staff principal's own id (from JWT), not org.
     user = (await db.execute(select(User).where(User.id == p.subject_id))).scalar_one()
     secret = totp_service.new_secret()
     user.totp_secret = secret
     await db.flush()
-    return MfaEnrollStart(secret=secret, provisioning_uri=totp_service.provisioning_uri(secret, user.email))
+    return MfaEnrollStart(
+        secret=secret,
+        provisioning_uri=totp_service.provisioning_uri(
+            secret, user.email, issuer=get_settings().jwt_issuer
+        ),
+    )
 
 
 @router.post("/mfa/enroll/verify", response_model=MfaBackupCodes)
@@ -142,6 +176,7 @@ async def mfa_verify(
     p: Principal = Depends(require_staff()),
     db: AsyncSession = Depends(get_db),
 ) -> MfaBackupCodes:
+    # idor-safe: scoped to the authenticated staff principal's own id (from JWT), not org.
     user = (await db.execute(select(User).where(User.id == p.subject_id))).scalar_one()
     if not user.totp_secret or not totp_service.verify(user.totp_secret, body.totp_code):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid code")
@@ -166,4 +201,81 @@ async def logout(request: Request, p: Principal = Depends(current_principal), db
         phi_accessed=False,
         ip=request.client.host if request.client else None,
         user_agent=request.headers.get("user-agent"),
+    ))
+
+
+def _password_http_error(exc: Exception) -> HTTPException:
+    reasons = getattr(exc, "reasons", None) or [str(exc)]
+    return HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, {"password": reasons})
+
+
+@router.post("/password/forgot", status_code=status.HTTP_202_ACCEPTED)
+async def password_forgot(
+    body: PasswordForgotRequest, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Begin a password reset. Always returns 202 — never reveals whether the
+    email maps to an account (no user enumeration)."""
+    email = body.email.lower()
+    user = (await db.execute(
+        select(User).where(User.email == email, User.deleted_at.is_(None))
+    )).scalar_one_or_none()
+    if user is not None:
+        raw = await password_service.issue_reset_token(db, user)
+        reset_url = f"{get_settings().admin_url}/reset-password?token={raw}"
+        await email_service.send(
+            to=user.email,
+            subject="Reset your Practice Scheduler password",
+            html_body=(
+                "<p>A password reset was requested for your account. This link "
+                f"expires in {get_settings().password_reset_ttl_min} minutes.</p>"
+                f'<p><a href="{reset_url}">Reset your password</a></p>'
+                "<p>If you did not request this, ignore this email.</p>"
+            ),
+        )
+        db.add(ActivityLog(
+            org_id=user.org_id, actor_type="user", actor_id=user.id, actor_email=user.email,
+            entity_type="user", entity_id=user.id, action="password_reset_requested", changes={},
+        ))
+    return {"status": "accepted"}
+
+
+@router.post("/password/reset", status_code=status.HTTP_204_NO_CONTENT)
+async def password_reset(
+    body: PasswordResetRequest, db: AsyncSession = Depends(get_db)
+) -> None:
+    """Complete a password reset with a single-use token. Invalidates existing
+    sessions so a stolen session can't survive the reset."""
+    user = await password_service.consume_reset_token(db, body.token)
+    if user is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid or expired token")
+    try:
+        await password_service.set_password(db, user, body.new_password)
+    except (password_policy.PasswordPolicyError, password_service.PasswordReuseError) as exc:
+        raise _password_http_error(exc)
+    user.sessions_invalid_after = datetime.utcnow()
+    db.add(ActivityLog(
+        org_id=user.org_id, actor_type="user", actor_id=user.id, actor_email=user.email,
+        entity_type="user", entity_id=user.id, action="password_reset", changes={},
+    ))
+
+
+@router.post("/password/change", status_code=status.HTTP_204_NO_CONTENT)
+async def password_change(
+    body: PasswordChangeRequest,
+    p: Principal = Depends(require_staff()),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Authenticated self-service password change. Verifies the current password,
+    enforces policy + reuse prevention on the new one."""
+    # idor-safe: scoped to the authenticated staff principal's own id (from JWT), not org.
+    user = (await db.execute(select(User).where(User.id == p.subject_id))).scalar_one()
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "current password incorrect")
+    try:
+        await password_service.set_password(db, user, body.new_password)
+    except (password_policy.PasswordPolicyError, password_service.PasswordReuseError) as exc:
+        raise _password_http_error(exc)
+    db.add(ActivityLog(
+        org_id=user.org_id, actor_type="user", actor_id=user.id, actor_email=user.email,
+        entity_type="user", entity_id=user.id, action="password_changed", changes={},
     ))

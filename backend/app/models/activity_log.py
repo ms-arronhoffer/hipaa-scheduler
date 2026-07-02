@@ -5,7 +5,7 @@ Retention: 6-year HIPAA floor; never hard-deleted before that.
 """
 import uuid
 
-from sqlalchemy import Index, String
+from sqlalchemy import BigInteger, Index, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,7 @@ class ActivityLog(Base, UUIDPk, OrgScoped, TimestampMixin):
         Index("ix_activity_org_entity", "org_id", "entity_type", "entity_id"),
         Index("ix_activity_org_actor", "org_id", "actor_type", "actor_id"),
         Index("ix_activity_org_phi", "org_id", "phi_accessed", "created_at"),
+        Index("ix_activity_org_seq", "org_id", "seq"),
     )
 
     actor_type: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -38,3 +39,10 @@ class ActivityLog(Base, UUIDPk, OrgScoped, TimestampMixin):
     ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
     request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Tamper-evident hash chain (per org). Assigned at flush time by
+    # app.services.audit_chain: entry_hash = sha256(prev_hash + canonical(row)).
+    # A break anywhere in the chain is detectable by re-walking it.
+    seq: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    entry_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)

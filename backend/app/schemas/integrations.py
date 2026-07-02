@@ -77,7 +77,9 @@ class WebhookDeliveryOut(ORMModel):
     attempt: int
     status: str
     response_status: int | None
+    response_body_snippet: str | None = None
     next_attempt_at: datetime | None
+    last_attempt_at: datetime | None = None
     delivered_at: datetime | None
     created_at: datetime
 
@@ -99,3 +101,9 @@ class CalendarConnectionOut(ORMModel):
 class CalendarConnectionUpdate(BaseModel):
     active: bool | None = None
     calendar_id: str | None = None
+
+
+class CalendarAuthorizeResponse(BaseModel):
+    """Provider authorization URL the SPA redirects the browser to."""
+    authorization_url: str
+    state: str

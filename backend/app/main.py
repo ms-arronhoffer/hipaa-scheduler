@@ -74,6 +74,19 @@ async def readyz() -> dict:
     return {"status": "ready"}
 
 
+@app.get("/api/v1/worker/health", tags=["health"])
+async def worker_health() -> dict:
+    """Liveness of the background worker + freshness of each scheduled job.
+
+    Reads the heartbeat file the worker writes after every scheduler tick. Used
+    for job-queue monitoring / alerting — an unhealthy result means the worker
+    is hung, dead, or a job last failed.
+    """
+    from app.tasks import heartbeat
+
+    return heartbeat.read_status()
+
+
 from app.routers import (
     activity_log,
     api_keys,
@@ -81,6 +94,7 @@ from app.routers import (
     appointments,
     auth,
     availability,
+    calendar_oauth,
     calendar_sync,
     consents,
     documents,
@@ -94,6 +108,8 @@ from app.routers import (
     providers,
     public_booking,
     public_confirm,
+    public_portal,
+    public_sms,
     reminders,
     reports,
     timeoff,
@@ -144,10 +160,13 @@ app.include_router(reports.router, prefix=API_V1)
 app.include_router(api_keys.router, prefix=API_V1)
 app.include_router(webhooks.router, prefix=API_V1)
 app.include_router(calendar_sync.router, prefix=API_V1)
+app.include_router(calendar_oauth.router, prefix=API_V1)
 
 # Public (unauthenticated) surfaces
 app.include_router(public_booking.router, prefix=API_V1)
+app.include_router(public_portal.router, prefix=API_V1)
 app.include_router(public_confirm.router, prefix=API_V1)
+app.include_router(public_sms.router, prefix=API_V1)
 
 # Super-admin
 app.include_router(admin_tenants.router, prefix=API_V1)

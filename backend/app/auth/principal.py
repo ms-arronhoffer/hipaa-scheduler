@@ -47,7 +47,7 @@ def _unauth(detail: str = "unauthorized") -> HTTPException:
     return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
 
 
-async def _resolve_user(db: AsyncSession, sub: str, org_id: str | None, mfa_claim: bool) -> Principal:
+async def _resolve_user(db: AsyncSession, sub: str, org_id: str | None, mfa_claim: bool, iat: int | None = None) -> Principal:
     try:
         uid = uuid.UUID(sub)
     except ValueError:
@@ -57,6 +57,14 @@ async def _resolve_user(db: AsyncSession, sub: str, org_id: str | None, mfa_clai
         raise _unauth()
     if org_id and str(row.org_id) != str(org_id):
         raise _unauth("org mismatch")
+    # "Sign out everywhere": reject any token issued at or before the cutoff.
+    if row.sessions_invalid_after is not None and iat is not None:
+        cutoff = row.sessions_invalid_after
+        if cutoff.tzinfo is None:
+            from datetime import timezone as _tz
+            cutoff = cutoff.replace(tzinfo=_tz.utc)
+        if iat <= int(cutoff.timestamp()):
+            raise _unauth("session revoked")
     return Principal(
         kind="user",
         subject_id=row.id,
@@ -68,7 +76,7 @@ async def _resolve_user(db: AsyncSession, sub: str, org_id: str | None, mfa_clai
     )
 
 
-async def _resolve_patient(db: AsyncSession, sub: str, org_id: str | None) -> Principal:
+async def _resolve_patient(db: AsyncSession, sub: str, org_id: str | None, iat: int | None = None) -> Principal:
     try:
         pid = uuid.UUID(sub)
     except ValueError:
@@ -78,6 +86,14 @@ async def _resolve_patient(db: AsyncSession, sub: str, org_id: str | None) -> Pr
         raise _unauth()
     if not org_id:
         raise _unauth("org missing")
+    # "Sign out everywhere": reject any token issued at or before the cutoff.
+    if row.sessions_invalid_after is not None and iat is not None:
+        cutoff = row.sessions_invalid_after
+        if cutoff.tzinfo is None:
+            from datetime import timezone as _tz
+            cutoff = cutoff.replace(tzinfo=_tz.utc)
+        if iat <= int(cutoff.timestamp()):
+            raise _unauth("session revoked")
     return Principal(
         kind="patient",
         subject_id=row.id,
@@ -120,14 +136,15 @@ async def current_principal(
     # Try staff audience first, then patient. jwt raises on aud mismatch.
     try:
         claims = jwt_decode(token, audience="staff")
-        p = await _resolve_user(db, claims["sub"], claims.get("org_id"), bool(claims.get("mfa_ok", False)))
+        p = await _resolve_user(db, claims["sub"], claims.get("org_id"), bool(claims.get("mfa_ok", False)), claims.get("iat"))
     except Exception:
         try:
             claims = jwt_decode(token, audience="patient")
-            p = await _resolve_patient(db, claims["sub"], claims.get("org_id"))
+            p = await _resolve_patient(db, claims["sub"], claims.get("org_id"), claims.get("iat"))
         except Exception:
             raise _unauth()
     request.state.principal = p
+    request.state.token_claims = claims
     return p
 
 

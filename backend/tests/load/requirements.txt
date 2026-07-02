@@ -1,0 +1,4 @@
+# Load-testing tooling only — deliberately kept out of the app image and the
+# main backend/requirements.txt so production/CI never pulls it in.
+# See backend/tests/load/README.md.
+locust==2.44.4

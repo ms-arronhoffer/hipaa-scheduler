@@ -3,6 +3,7 @@
 Runs periodic background jobs:
 - reminder_sweep: enqueue email/SMS reminders based on ReminderRule offsets
 - webhook_retry: retry failed WebhookDelivery rows with backoff
+- notification_retry: retry failed email/SMS NotificationLog rows with backoff
 - waitlist_fill: on cancellation events, notify next waitlist entries
 - retention_sweep: soft-delete rows past HIPAA 6-year retention floor
 - calendar_pull: incremental sync from connected Google/O365 calendars
@@ -30,6 +31,10 @@ async def main() -> None:
     from app.tasks.webhook_retry import run_webhook_retry
     scheduler.add_job(run_webhook_retry, "interval", minutes=1, id="webhook_retry")
 
+    # Notification (email/SMS) delivery retry every 2 minutes
+    from app.tasks.notification_retry import run_notification_retry
+    scheduler.add_job(run_notification_retry, "interval", minutes=2, id="notification_retry")
+
     # Retention sweep nightly at 03:15 UTC
     from app.tasks.retention_sweep import run_retention_sweep
     scheduler.add_job(run_retention_sweep, "cron", hour=3, minute=15, id="retention_sweep")
@@ -37,6 +42,14 @@ async def main() -> None:
     # Calendar incremental pull every 10 min
     from app.tasks.calendar_pull import run_calendar_pull
     scheduler.add_job(run_calendar_pull, "interval", minutes=10, id="calendar_pull")
+
+    # Liveness heartbeat every minute so the API `/worker/health` probe can
+    # detect a hung/dead worker even when no substantive job has run recently.
+    from app.tasks import heartbeat
+    scheduler.add_job(
+        lambda: heartbeat.beat("scheduler", ok=True), "interval", minutes=1, id="scheduler_heartbeat"
+    )
+    heartbeat.beat("scheduler", ok=True)
 
     scheduler.start()
     logger.info(

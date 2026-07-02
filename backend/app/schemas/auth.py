@@ -10,6 +10,7 @@ class StaffLoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=200)
     totp_code: str | None = Field(default=None, min_length=6, max_length=8)
+    backup_code: str | None = Field(default=None, min_length=8, max_length=64)
 
 
 class TokenResponse(BaseModel):
@@ -47,3 +48,17 @@ class PatientMagicLinkConsume(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class PasswordForgotRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequest(BaseModel):
+    token: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=1, max_length=200)
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=1, max_length=200)

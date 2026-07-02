@@ -24,6 +24,21 @@ export default function PortalShell({ children }: { children: ReactNode }) {
                 },
                 {
                   type: "button",
+                  text: "Consents & documents",
+                  onClick: () => nav("/me/consents"),
+                },
+                {
+                  type: "button",
+                  text: "Intake forms",
+                  onClick: () => nav("/me/intake"),
+                },
+                {
+                  type: "button",
+                  text: "Security",
+                  onClick: () => nav("/me/security"),
+                },
+                {
+                  type: "button",
                   text: "Sign out",
                   onClick: () => {
                     logout();

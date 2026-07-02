@@ -11,11 +11,13 @@ import uuid
 from typing import Callable
 
 from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import Principal, current_principal
 from app.database import get_db
 from app.models.activity_log import ActivityLog
+from app.models.patient import Patient
 
 
 def require_kinds(*kinds: str) -> Callable:
@@ -81,6 +83,28 @@ def enforce_org_access(org_id_param: str = "org_id") -> Callable:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "org mismatch")
         return p
     return _dep
+
+
+async def ensure_patient_in_org(
+    db: AsyncSession, patient_id: uuid.UUID, org_id: uuid.UUID
+) -> None:
+    """Verify a patient row belongs to the caller's org (tenant isolation).
+
+    Call this in every handler that accepts a ``patient_id`` from the request
+    body or query string before using it. Raises 404 — never an empty 200 or a
+    403 — when the patient does not exist or belongs to another org, so a caller
+    can neither read cross-tenant data nor probe for the existence of IDs in
+    other tenants (IDOR / enumeration defense).
+    """
+    found = (await db.execute(
+        select(Patient.id).where(
+            Patient.id == patient_id,
+            Patient.org_id == org_id,
+            Patient.deleted_at.is_(None),
+        )
+    )).scalar_one_or_none()
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "patient not found")
 
 
 def phi_log(entity_type: str, action: str = "viewed") -> Callable:

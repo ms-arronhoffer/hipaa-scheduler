@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, OrgScoped, SoftDeleteMixin, TimestampMixin, UUIDPk
+from app.models.types import EncryptedString
 
 
 APPOINTMENT_STATUSES = (
@@ -77,4 +78,4 @@ class Appointment(Base, UUIDPk, OrgScoped, TimestampMixin, SoftDeleteMixin):
     cancel_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
     no_show_marked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    notes: Mapped[str | None] = mapped_column(String(2000), nullable=True)  # reserved for future encryption
+    notes: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)  # PHI — encrypted at rest

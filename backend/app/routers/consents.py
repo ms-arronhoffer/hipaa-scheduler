@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import Principal
 from app.database import get_db
-from app.guards.deps import phi_log, require_role
+from app.guards.deps import ensure_patient_in_org, phi_log, require_role
 from app.models.activity_log import ActivityLog
 from app.models.patient_records import CONSENT_KINDS, Consent
 from app.schemas.patient_records import ConsentCreate, ConsentOut
@@ -28,6 +28,7 @@ async def list_consents(
 ) -> list[Consent]:
     stmt = select(Consent).where(Consent.org_id == p.org_id, Consent.deleted_at.is_(None))
     if patient_id is not None:
+        await ensure_patient_in_org(db, patient_id, p.org_id)
         stmt = stmt.where(Consent.patient_id == patient_id)
     if kind is not None:
         stmt = stmt.where(Consent.kind == kind)
@@ -44,6 +45,7 @@ async def create_consent(
 ) -> Consent:
     if body.kind not in CONSENT_KINDS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"kind must be one of {CONSENT_KINDS}")
+    await ensure_patient_in_org(db, body.patient_id, p.org_id)
     row = Consent(
         org_id=p.org_id,
         patient_id=body.patient_id,

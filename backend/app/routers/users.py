@@ -21,6 +21,8 @@ from app.guards.deps import require_role
 from app.models.activity_log import ActivityLog
 from app.models.user import User
 from app.schemas.user import STAFF_ROLES, UserCreate, UserOut, UserUpdate
+from app.services import password_service
+from app.auth import password_policy
 
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -32,6 +34,11 @@ def _validate_roles(roles: list[str] | None) -> None:
     for r in roles:
         if r not in STAFF_ROLES:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"unknown role {r}")
+
+
+def _password_error(exc: Exception) -> HTTPException:
+    reasons = getattr(exc, "reasons", None) or [str(exc)]
+    return HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, {"password": reasons})
 
 
 @router.get("", response_model=list[UserOut])
@@ -60,13 +67,18 @@ async def create_user(
         first_name=body.first_name,
         last_name=body.last_name,
         roles=body.roles,
-        password_hash=hash_password(body.password) if body.password else None,
+        password_hash=None,
     )
     db.add(row)
     try:
         await db.flush()
     except IntegrityError:
         raise HTTPException(status.HTTP_409_CONFLICT, "email already exists in this org")
+    if body.password:
+        try:
+            await password_service.set_password(db, row, body.password)
+        except (password_policy.PasswordPolicyError, password_service.PasswordReuseError) as exc:
+            raise _password_error(exc)
     db.add(ActivityLog(
         org_id=p.org_id, actor_type="user", actor_id=p.subject_id, actor_email=p.email,
         entity_type="user", entity_id=row.id, action="created",
@@ -108,7 +120,10 @@ async def update_user(
     if "password" in data:
         pw = data.pop("password")
         if pw:
-            row.password_hash = hash_password(pw)
+            try:
+                await password_service.set_password(db, row, pw)
+            except (password_policy.PasswordPolicyError, password_service.PasswordReuseError) as exc:
+                raise _password_error(exc)
     for k, v in data.items():
         setattr(row, k, v)
     db.add(ActivityLog(
@@ -139,5 +154,59 @@ async def delete_user(
     db.add(ActivityLog(
         org_id=p.org_id, actor_type="user", actor_id=p.subject_id, actor_email=p.email,
         entity_type="user", entity_id=row.id, action="disabled",
+        changes={"email": row.email},
+    ))
+
+
+async def _load_org_user(db: AsyncSession, user_id: uuid.UUID, org_id: uuid.UUID) -> User:
+    row = (await db.execute(
+        select(User).where(
+            User.id == user_id, User.org_id == org_id, User.deleted_at.is_(None),
+        )
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    return row
+
+
+@router.post("/{user_id}/mfa/reset", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_user_mfa(
+    user_id: uuid.UUID,
+    p: Principal = Depends(require_role("practice_admin")),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Support action: clear a staff user's MFA enrollment so they can re-enroll.
+
+    Used when a user loses their authenticator + backup codes. Wipes the TOTP
+    secret, backup codes, and enrollment flag; the user re-enrolls via
+    ``/auth/mfa/enroll/*`` on next login. Logged for audit.
+    """
+    row = await _load_org_user(db, user_id, p.org_id)
+    row.mfa_enrolled = False
+    row.totp_secret = None
+    row.backup_codes = []
+    db.add(ActivityLog(
+        org_id=p.org_id, actor_type="user", actor_id=p.subject_id, actor_email=p.email,
+        entity_type="user", entity_id=row.id, action="mfa_reset",
+        changes={"email": row.email},
+    ))
+
+
+@router.post("/{user_id}/sign-out-everywhere", status_code=status.HTTP_204_NO_CONTENT)
+async def sign_out_everywhere(
+    user_id: uuid.UUID,
+    p: Principal = Depends(require_role("practice_admin")),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Invalidate all of a user's existing sessions (access + refresh tokens).
+
+    Sets ``sessions_invalid_after`` to now; every token issued at-or-before this
+    instant is rejected by the principal resolver, forcing re-login everywhere.
+    """
+    row = await _load_org_user(db, user_id, p.org_id)
+    row.sessions_invalid_after = datetime.utcnow()
+    db.add(ActivityLog(
+        org_id=p.org_id, actor_type="user", actor_id=p.subject_id, actor_email=p.email,
+        entity_type="user", entity_id=row.id, action="sessions_revoked",
         changes={"email": row.email},
     ))

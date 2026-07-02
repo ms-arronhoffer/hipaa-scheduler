@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, OrgScoped, SoftDeleteMixin, TimestampMixin, UUIDPk
+from app.models.types import EncryptedString
 
 
 class Patient(Base, UUIDPk, OrgScoped, TimestampMixin, SoftDeleteMixin):
@@ -56,5 +57,10 @@ class PatientAccount(Base, UUIDPk, TimestampMixin, SoftDeleteMixin):
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     auth_mode: Mapped[str] = mapped_column(String(10), default="magic", nullable=False)
     mfa_enrolled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    totp_secret: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # "Sign out everywhere": any patient access token issued at or before this
+    # instant is rejected on the next request (mirrors User.sessions_invalid_after).
+    sessions_invalid_after: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

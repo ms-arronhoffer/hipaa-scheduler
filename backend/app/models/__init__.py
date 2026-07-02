@@ -20,5 +20,6 @@ from app.models.notification import (  # noqa: F401
     ReminderRule,
 )
 from app.models.calendar_connection import CalendarConnection  # noqa: F401
+from app.models.calendar_sync_link import CalendarSyncLink  # noqa: F401
 from app.models.tokens import MagicLinkToken, ConfirmToken  # noqa: F401
 from app.models.usage import UsageEvent  # noqa: F401
