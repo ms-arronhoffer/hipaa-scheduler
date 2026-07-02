@@ -1,8 +1,8 @@
 """Calendar incremental pull worker task.
 
 Every 10 minutes: refresh OAuth access tokens that are near expiry so connected
-Google/O365 calendars keep valid credentials, then invoke the event-reconcile
-hook per connection. Event reconciliation itself is not yet implemented (see
+Google/O365 calendars keep valid credentials, then reconcile events per
+connection (mirror appointments out + repair remote drift — see
 :func:`app.services.calendar_service.reconcile_events`).
 """
 from __future__ import annotations
@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 async def run_calendar_pull() -> dict[str, int]:
     refreshed = 0
     scanned = 0
+    reconciled = 0
     try:
         async with AsyncSessionLocal() as db:
             conns = (await db.execute(
@@ -35,10 +36,13 @@ async def run_calendar_pull() -> dict[str, int]:
                 if calendar_service.needs_refresh(conn):
                     if await calendar_service.refresh_token(db, conn):
                         refreshed += 1
-                await calendar_service.reconcile_events(db, conn)
+                reconciled += await calendar_service.reconcile_events(db, conn)
             await db.commit()
-        heartbeat.beat("calendar_pull", ok=True, detail={"scanned": scanned, "refreshed": refreshed})
-        return {"scanned": scanned, "refreshed": refreshed}
+        heartbeat.beat(
+            "calendar_pull", ok=True,
+            detail={"scanned": scanned, "refreshed": refreshed, "reconciled": reconciled},
+        )
+        return {"scanned": scanned, "refreshed": refreshed, "reconciled": reconciled}
     except Exception as exc:  # noqa: BLE001
         log.exception("calendar_pull_failed")
         heartbeat.beat("calendar_pull", ok=False, detail={"error": type(exc).__name__})

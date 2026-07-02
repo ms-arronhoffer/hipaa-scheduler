@@ -54,7 +54,7 @@ or export path.
 | Outbound SMS (Twilio) | Reminder sweep, opt-in prompt | ≤160 chars, appointment time + short link only; never patient full name | Yes |
 | Outbound webhooks | Appointment/patient/intake/waitlist events | Envelope explicitly enumerated in `webhook_service.py`; HMAC signed | No (subscriber is the covered entity or a BA of theirs — their responsibility) |
 | iCal export | Provider-initiated URL | Appointment times + type only (NOT patient name) unless the provider opts in per calendar | No (goes to the provider's own calendar app under their control) |
-| Two-way calendar sync (Google/O365) | OAuth-connected provider | Appointment times + minimal patient identifier chosen by the provider (default: "Patient" placeholder; opt-in to name) | Yes (Google/MS BAA) |
+| Two-way calendar sync (Google/O365) | OAuth-connected provider | Appointment times only; event summary is a fixed PHI-free placeholder (`"Appointment"`) plus the opaque appointment UUID in a private property — no patient identifiers leave the app | Yes (Google/MS BAA) |
 
 ## Contact / breach response
 

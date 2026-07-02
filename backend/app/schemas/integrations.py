@@ -101,3 +101,9 @@ class CalendarConnectionOut(ORMModel):
 class CalendarConnectionUpdate(BaseModel):
     active: bool | None = None
     calendar_id: str | None = None
+
+
+class CalendarAuthorizeResponse(BaseModel):
+    """Provider authorization URL the SPA redirects the browser to."""
+    authorization_url: str
+    state: str

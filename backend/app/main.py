@@ -94,6 +94,7 @@ from app.routers import (
     appointments,
     auth,
     availability,
+    calendar_oauth,
     calendar_sync,
     consents,
     documents,
@@ -158,6 +159,7 @@ app.include_router(reports.router, prefix=API_V1)
 app.include_router(api_keys.router, prefix=API_V1)
 app.include_router(webhooks.router, prefix=API_V1)
 app.include_router(calendar_sync.router, prefix=API_V1)
+app.include_router(calendar_oauth.router, prefix=API_V1)
 
 # Public (unauthenticated) surfaces
 app.include_router(public_booking.router, prefix=API_V1)

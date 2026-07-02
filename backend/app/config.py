@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     google_oauth_secret: SecretStr | None = None
     ms_oauth_id: str | None = None
     ms_oauth_secret: SecretStr | None = None
+    # OAuth redirect (callback) URIs registered with each provider. When unset
+    # they are derived from `frontend_url` + the callback route. They MUST be
+    # publicly reachable and match the provider console's allow-list exactly.
+    google_oauth_redirect_uri: str | None = None
+    ms_oauth_redirect_uri: str | None = None
+    # After a successful OAuth callback the browser is redirected here (staff
+    # calendar-settings page). `?calendar=<connected|error>` is appended.
+    calendar_oauth_success_path: str = "/settings/integrations"
+    # Forward window (days) the reconcile pass mirrors appointments into the
+    # connected calendar. Past events and events beyond the window are ignored.
+    calendar_sync_window_days: int = 30
 
     # Webhooks
     webhook_hmac_alg: str = "sha256"
