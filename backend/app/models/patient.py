@@ -59,3 +59,8 @@ class PatientAccount(Base, UUIDPk, TimestampMixin, SoftDeleteMixin):
     mfa_enrolled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     totp_secret: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # "Sign out everywhere": any patient access token issued at or before this
+    # instant is rejected on the next request (mirrors User.sessions_invalid_after).
+    sessions_invalid_after: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

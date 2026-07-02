@@ -76,7 +76,7 @@ async def _resolve_user(db: AsyncSession, sub: str, org_id: str | None, mfa_clai
     )
 
 
-async def _resolve_patient(db: AsyncSession, sub: str, org_id: str | None) -> Principal:
+async def _resolve_patient(db: AsyncSession, sub: str, org_id: str | None, iat: int | None = None) -> Principal:
     try:
         pid = uuid.UUID(sub)
     except ValueError:
@@ -86,6 +86,14 @@ async def _resolve_patient(db: AsyncSession, sub: str, org_id: str | None) -> Pr
         raise _unauth()
     if not org_id:
         raise _unauth("org missing")
+    # "Sign out everywhere": reject any token issued at or before the cutoff.
+    if row.sessions_invalid_after is not None and iat is not None:
+        cutoff = row.sessions_invalid_after
+        if cutoff.tzinfo is None:
+            from datetime import timezone as _tz
+            cutoff = cutoff.replace(tzinfo=_tz.utc)
+        if iat <= int(cutoff.timestamp()):
+            raise _unauth("session revoked")
     return Principal(
         kind="patient",
         subject_id=row.id,
@@ -132,10 +140,11 @@ async def current_principal(
     except Exception:
         try:
             claims = jwt_decode(token, audience="patient")
-            p = await _resolve_patient(db, claims["sub"], claims.get("org_id"))
+            p = await _resolve_patient(db, claims["sub"], claims.get("org_id"), claims.get("iat"))
         except Exception:
             raise _unauth()
     request.state.principal = p
+    request.state.token_claims = claims
     return p
 
 
