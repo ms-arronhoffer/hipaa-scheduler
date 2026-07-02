@@ -18,6 +18,7 @@ from app.database import get_db
 from app.guards.deps import require_role
 from app.models.activity_log import ActivityLog
 from app.schemas.common import ORMModel
+from app.services import audit_chain
 
 
 router = APIRouter(prefix="/activity-log", tags=["activity_log"])
@@ -93,3 +94,30 @@ async def list_activity(
         items=[ActivityLogOut.model_validate(r) for r in rows],
         total=total, limit=limit, offset=offset,
     )
+
+
+class ChainVerifyResult(ORMModel):
+    ok: bool
+    checked: int
+    broken_at: int | None
+
+
+@router.get("/verify", response_model=ChainVerifyResult)
+async def verify_audit_chain(
+    limit: int = Query(default=10000, ge=1, le=100000),
+    p: Principal = Depends(require_role("practice_admin")),
+    db: AsyncSession = Depends(get_db),
+) -> ChainVerifyResult:
+    """Re-walk this org's audit hash chain and report the first break, if any.
+
+    A ``broken_at`` sequence number means a row was altered or removed after it
+    was written — evidence of tampering with the "immutable" audit trail.
+    """
+    rows = (await db.execute(
+        select(ActivityLog)
+        .where(ActivityLog.org_id == p.org_id, ActivityLog.entry_hash.is_not(None))
+        .order_by(ActivityLog.seq.asc())
+        .limit(limit)
+    )).scalars().all()
+    result = audit_chain.verify_chain(rows)
+    return ChainVerifyResult(**result)

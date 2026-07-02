@@ -30,6 +30,22 @@ class Base(DeclarativeBase):
     pass
 
 
+# Tamper-evident audit chaining: assign the ActivityLog hash chain at flush
+# time. Registered on the sync Session class that the async session drives, so
+# the handler runs inside the flush's live connection and can read the current
+# chain head. Imported lazily inside the handler to avoid an import cycle
+# (audit_chain imports the ActivityLog model).
+from sqlalchemy import event  # noqa: E402
+from sqlalchemy.orm import Session as _SyncSession  # noqa: E402
+
+
+@event.listens_for(_SyncSession, "before_flush")
+def _assign_audit_chain(session, _flush_context, _instances) -> None:
+    from app.services.audit_chain import assign_chain
+
+    assign_chain(session)
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
