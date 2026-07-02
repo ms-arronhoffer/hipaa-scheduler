@@ -112,6 +112,13 @@ async def hibp_breach_count(password: str) -> int:
     """
     if not settings.password_hibp_enabled or settings.app_env != "production":
         return 0
+    # SHA-1 here is NOT password storage — it is mandated by HIBP's Pwned
+    # Passwords range API. The k-anonymity model only transmits the first 5 hex
+    # chars of the digest; the full hash never leaves this process, and SHA-1's
+    # (lack of) computational cost is irrelevant because we are querying a
+    # published breach corpus, not deriving or verifying a stored credential.
+    # Passwords are stored with bcrypt elsewhere (see password_service).
+    # codeql[py/weak-sensitive-data-hashing]
     digest = hashlib.sha1(password.encode("utf-8")).hexdigest().upper()  # noqa: S324 - HIBP protocol requires SHA-1
     prefix, suffix = digest[:5], digest[5:]
     try:

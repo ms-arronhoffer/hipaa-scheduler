@@ -78,6 +78,9 @@ def verify_twilio_signature(url: str, params: dict[str, str], signature: str | N
     digest = hmac.new(
         token.get_secret_value().encode("utf-8"),
         data.encode("utf-8"),
+        # SHA-1 is used inside HMAC (keyed), not as a bare hash: HMAC's security
+        # does not rely on the collision resistance of the underlying hash, and
+        # Twilio's signature protocol mandates HMAC-SHA1. Not password hashing.
         hashlib.sha1,  # noqa: S324 - required by the Twilio signing protocol
     ).digest()
     expected = base64.b64encode(digest).decode("ascii")
