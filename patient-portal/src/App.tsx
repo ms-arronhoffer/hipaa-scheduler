@@ -13,6 +13,9 @@ const LoginPage = lazy(() => import("./pages/LoginPage"));
 const MagicConsumePage = lazy(() => import("./pages/MagicConsumePage"));
 const ClaimPage = lazy(() => import("./pages/ClaimPage"));
 const MyAppointmentsPage = lazy(() => import("./pages/MyAppointmentsPage"));
+const ConsentsPage = lazy(() => import("./pages/ConsentsPage"));
+const IntakePage = lazy(() => import("./pages/IntakePage"));
+const SecurityPage = lazy(() => import("./pages/SecurityPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 function Loader() {
@@ -44,6 +47,30 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <MyAppointmentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/me/consents"
+            element={
+              <ProtectedRoute>
+                <ConsentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/me/intake"
+            element={
+              <ProtectedRoute>
+                <IntakePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/me/security"
+            element={
+              <ProtectedRoute>
+                <SecurityPage />
               </ProtectedRoute>
             }
           />
