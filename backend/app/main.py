@@ -74,6 +74,19 @@ async def readyz() -> dict:
     return {"status": "ready"}
 
 
+@app.get("/api/v1/worker/health", tags=["health"])
+async def worker_health() -> dict:
+    """Liveness of the background worker + freshness of each scheduled job.
+
+    Reads the heartbeat file the worker writes after every scheduler tick. Used
+    for job-queue monitoring / alerting — an unhealthy result means the worker
+    is hung, dead, or a job last failed.
+    """
+    from app.tasks import heartbeat
+
+    return heartbeat.read_status()
+
+
 from app.routers import (
     activity_log,
     api_keys,

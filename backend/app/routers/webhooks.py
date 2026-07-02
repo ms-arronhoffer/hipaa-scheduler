@@ -82,6 +82,7 @@ async def create_subscription(
         target_url=str(body.target_url),
         events=body.events,
         secret_hash=digest,
+        secret_ct=plain,
         active=body.active,
     )
     db.add(row)
@@ -138,6 +139,7 @@ async def rotate_secret(
         raise HTTPException(status.HTTP_404_NOT_FOUND)
     plain, digest = _generate_secret()
     row.secret_hash = digest
+    row.secret_ct = plain
     db.add(ActivityLog(
         org_id=p.org_id, actor_type="user", actor_id=p.subject_id, actor_email=p.email,
         entity_type="webhook_subscription", entity_id=row.id, action="secret_rotated",

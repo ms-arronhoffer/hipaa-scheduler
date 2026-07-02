@@ -82,6 +82,19 @@ class Settings(BaseSettings):
     # Observability
     sentry_dsn: str | None = None
 
+    # Background worker liveness. The worker writes a heartbeat file after each
+    # scheduler tick; the API `/worker/health` probe reads it and reports stale
+    # if it hasn't been updated within `worker_heartbeat_max_age_sec`.
+    worker_heartbeat_path: str = "/tmp/hs_worker_heartbeat.json"
+    worker_heartbeat_max_age_sec: int = 900
+
+    # Password policy & lifecycle
+    password_min_length: int = 12
+    password_expiry_days: int = 90  # 0 disables expiry
+    password_history_depth: int = 5  # remembered hashes to block reuse; 0 disables
+    password_hibp_enabled: bool = True  # k-anonymity breach check (pwnedpasswords.com)
+    password_reset_ttl_min: int = 30
+
     @computed_field  # type: ignore[misc]
     @property
     def super_admin_email_list(self) -> list[str]:

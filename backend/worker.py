@@ -38,6 +38,14 @@ async def main() -> None:
     from app.tasks.calendar_pull import run_calendar_pull
     scheduler.add_job(run_calendar_pull, "interval", minutes=10, id="calendar_pull")
 
+    # Liveness heartbeat every minute so the API `/worker/health` probe can
+    # detect a hung/dead worker even when no substantive job has run recently.
+    from app.tasks import heartbeat
+    scheduler.add_job(
+        lambda: heartbeat.beat("scheduler", ok=True), "interval", minutes=1, id="scheduler_heartbeat"
+    )
+    heartbeat.beat("scheduler", ok=True)
+
     scheduler.start()
     logger.info(
         "worker.started",

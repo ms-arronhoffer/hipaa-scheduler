@@ -126,3 +126,30 @@ async def sweep(db: AsyncSession, *, now: datetime | None = None, look_ahead_min
                 except notification_service.NotificationError as e:
                     log.warning("reminder_skip", extra={"appt": str(appt.id), "err": str(e)})
     return created
+
+
+async def run_reminder_sweep() -> int:
+    """Worker entrypoint: open a session, run the sweep, commit, heartbeat."""
+    from app.database import AsyncSessionLocal
+    from app.tasks import heartbeat
+
+    created = 0
+    try:
+        async with AsyncSessionLocal() as db:
+            created = await sweep(db)
+            await db.commit()
+        heartbeat.beat("reminder_sweep", ok=True, detail={"created": created})
+    except Exception as exc:  # noqa: BLE001 - record failure, keep worker alive
+        log.exception("reminder_sweep_failed")
+        heartbeat.beat("reminder_sweep", ok=False, detail={"error": type(exc).__name__})
+        raise
+    return created
+
+
+if __name__ == "__main__":  # pragma: no cover - manual/CLI invocation
+    import asyncio
+
+    from app.utils.logging import configure_logging
+
+    configure_logging()
+    asyncio.run(run_reminder_sweep())

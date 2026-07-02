@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, OrgScoped, SoftDeleteMixin, TimestampMixin, UUIDPk
+from app.models.types import EncryptedString
 
 
 WEBHOOK_DELIVERY_STATUSES = ("pending", "delivered", "failed", "dead_letter")
@@ -23,6 +24,11 @@ class WebhookSubscription(Base, UUIDPk, OrgScoped, TimestampMixin, SoftDeleteMix
     target_url: Mapped[str] = mapped_column(String(500), nullable=False)
     events: Mapped[list[str]] = mapped_column(ARRAY(String(60)), default=list, nullable=False)
     secret_hash: Mapped[str] = mapped_column(String(128), nullable=False)  # sha256 of shared HMAC secret
+    # Encrypted-at-rest copy of the shared HMAC secret. Unlike ``secret_hash``
+    # (one-way, only good for display/compare), this is reversible so the
+    # background ``webhook_retry`` worker can re-sign a payload on a later
+    # attempt — the plaintext is otherwise only known at creation time.
+    secret_ct: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -42,5 +48,7 @@ class WebhookDelivery(Base, UUIDPk, OrgScoped, TimestampMixin):
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
     response_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
     response_body: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    response_body_snippet: Mapped[str | None] = mapped_column(String(500), nullable=True)
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
