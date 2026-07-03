@@ -45,6 +45,11 @@ class AppointmentOut(ORMModel):
     updated_at: datetime
 
 
+class AppointmentListOut(BaseModel):
+    items: list[AppointmentOut]
+    total: int
+
+
 class SlotOut(BaseModel):
     start_at: datetime
     end_at: datetime

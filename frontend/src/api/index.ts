@@ -62,6 +62,16 @@ export const officesApi = {
 
 export const providersApi = {
   list: () => apiClient.get("/providers").then((r) => r.data),
+  create: (body: {
+    user_id: string;
+    npi?: string | null;
+    specialty?: string | null;
+    default_office_id?: string | null;
+    color?: string | null;
+    bookable?: boolean;
+  }) => apiClient.post("/providers", body).then((r) => r.data),
+  update: (id: string, body: unknown) =>
+    apiClient.patch(`/providers/${id}`, body).then((r) => r.data),
 };
 
 export const appointmentTypesApi = {
