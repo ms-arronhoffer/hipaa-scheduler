@@ -89,7 +89,7 @@ async def get_document(
     return row
 
 
-@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_document(
     document_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin", "front_desk")),

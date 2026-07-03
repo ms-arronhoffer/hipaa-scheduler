@@ -78,7 +78,7 @@ class ImpersonationEnd(BaseModel):
     org_id: str
 
 
-@router.post("/end", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/end", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def end_impersonation(
     body: ImpersonationEnd,
     p: Principal = Depends(require_super_admin()),

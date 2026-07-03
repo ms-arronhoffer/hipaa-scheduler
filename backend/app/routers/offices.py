@@ -81,7 +81,7 @@ async def update_office(
     return row
 
 
-@router.delete("/{office_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{office_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_office(
     office_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),
@@ -139,7 +139,7 @@ async def update_resource(
     return row
 
 
-@resources_router.delete("/{resource_id}", status_code=status.HTTP_204_NO_CONTENT)
+@resources_router.delete("/{resource_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_resource(
     resource_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),

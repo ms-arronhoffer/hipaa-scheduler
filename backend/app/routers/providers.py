@@ -98,7 +98,7 @@ async def update_provider(
     return row
 
 
-@router.delete("/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{provider_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_provider(
     provider_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),

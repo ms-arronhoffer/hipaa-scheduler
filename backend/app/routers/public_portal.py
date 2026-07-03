@@ -229,7 +229,7 @@ async def my_session(
     )
 
 
-@router.post("/security/sign-out-everywhere", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/security/sign-out-everywhere", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def sign_out_everywhere(
     p: Principal = Depends(current_principal),
     db: AsyncSession = Depends(get_db),

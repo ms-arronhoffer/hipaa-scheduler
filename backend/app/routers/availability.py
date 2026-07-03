@@ -74,7 +74,7 @@ async def update_availability(
     return row
 
 
-@router.delete("/{availability_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{availability_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_availability(
     availability_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),

@@ -82,7 +82,7 @@ async def update_waitlist(
     return row
 
 
-@router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def cancel_waitlist(
     entry_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin", "front_desk", "provider")),

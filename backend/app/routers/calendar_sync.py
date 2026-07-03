@@ -98,7 +98,7 @@ async def update_connection(
     return row
 
 
-@router.delete("/{conn_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{conn_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_connection(
     conn_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin", "provider")),

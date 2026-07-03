@@ -187,7 +187,7 @@ async def mfa_verify(
     return MfaBackupCodes(codes=plaintext)
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def logout(request: Request, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)) -> None:
     db.add(ActivityLog(
         org_id=p.org_id,
@@ -239,7 +239,7 @@ async def password_forgot(
     return {"status": "accepted"}
 
 
-@router.post("/password/reset", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/password/reset", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def password_reset(
     body: PasswordResetRequest, db: AsyncSession = Depends(get_db)
 ) -> None:
@@ -259,7 +259,7 @@ async def password_reset(
     ))
 
 
-@router.post("/password/change", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/password/change", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def password_change(
     body: PasswordChangeRequest,
     p: Principal = Depends(require_staff()),

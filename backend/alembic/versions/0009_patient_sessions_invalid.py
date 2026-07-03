@@ -1,6 +1,6 @@
 """Patient portal "sign out everywhere" support.
 
-Revision ID: 0009_patient_sessions_invalid_after
+Revision ID: 0009_patient_sessions_invalid
 Revises: 0008_calendar_sync_links
 Create Date: 2026-07-02
 
@@ -12,7 +12,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0009_patient_sessions_invalid_after"
+revision = "0009_patient_sessions_invalid"
 down_revision = "0008_calendar_sync_links"
 branch_labels = None
 depends_on = None
