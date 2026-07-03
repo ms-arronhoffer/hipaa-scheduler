@@ -20,7 +20,7 @@ function daysUntil(iso: string | null): number | null {
   return Math.ceil(ms / 86400000);
 }
 
-function baaStatus(row: BaaTenant): JSX.Element {
+function baaStatus(row: BaaTenant): React.JSX.Element {
   if (!row.baa_signed_at) return <StatusIndicator type="warning">Not signed</StatusIndicator>;
   const d = daysUntil(row.baa_expires_at);
   if (d === null) return <StatusIndicator type="success">Signed</StatusIndicator>;
