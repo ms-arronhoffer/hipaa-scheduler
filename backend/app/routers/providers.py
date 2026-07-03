@@ -33,7 +33,7 @@ async def list_providers(
     out: list[ProviderOut] = []
     for profile, user in rows:
         item = ProviderOut.model_validate(profile)
-        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+        full_name = " ".join(filter(None, [user.first_name, user.last_name]))
         item.display_name = full_name or None
         item.email = user.email
         out.append(item)
