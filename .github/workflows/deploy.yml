@@ -43,17 +43,21 @@ jobs:
         env:
           ENV_FILE: ${{ vars.DEPLOY_ENV_FILE || '/opt/hipaa-scheduler/.env' }}
         run: |
-          # Resolve the published HTTPS host port from the deploy env file so
-          # this gate follows HTTPS_PORT (defaults to 5443, matching compose).
-          HTTPS_PORT="$(grep -E '^HTTPS_PORT=' "$ENV_FILE" | tail -1 | cut -d= -f2 | tr -d '[:space:]')"
-          HTTPS_PORT="${HTTPS_PORT:-5443}"
+          # Gate on the backend container's own Docker healthcheck (which curls
+          # http://localhost:8000/api/v1/readyz inside the container). Checking the
+          # container directly keeps this gate about backend readiness only, instead
+          # of coupling it to nginx, TLS certs, and the frontend edge path.
           for i in $(seq 1 30); do
-            if curl -fsk "https://localhost:${HTTPS_PORT}/api/v1/readyz"; then
+            status="$(docker compose --env-file "$ENV_FILE" ps backend --format '{{.Health}}' 2>/dev/null | tail -1)"
+            if [[ "$status" == "healthy" ]]; then
               echo "Backend healthy"
               exit 0
             fi
-            echo "Waiting for backend to become healthy ($i/30)..."
+            echo "Waiting for backend to become healthy ($i/30, status=${status:-unknown})..."
             sleep 5
           done
           echo "Backend did not become healthy in time" >&2
+          # Surface diagnostics so a failed gate is debuggable from the run logs.
+          docker compose --env-file "$ENV_FILE" ps || true
+          docker compose --env-file "$ENV_FILE" logs --tail=100 backend || true
           exit 1
