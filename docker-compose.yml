@@ -128,7 +128,9 @@ services:
       - internal
 
   nginx:
-    image: nginx:1.27-alpine
+    build: ./nginx
+    image: hipaa-scheduler-nginx:latest
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       - backend
