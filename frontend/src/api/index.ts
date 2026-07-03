@@ -4,14 +4,25 @@ import { apiClient } from "./client";
 // endpoints stay discoverable next to the pages that use them.
 
 // Patients
+export interface PatientAddress {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+}
 export interface Patient {
   id: string;
   mrn: string | null;
   first_name: string;
   last_name: string;
+  middle_name: string | null;
   dob: string | null;
+  sex: string | null;
   email: string | null;
   phone: string | null;
+  address: PatientAddress | null;
+  preferred_office_id: string | null;
   sms_opt_in_at: string | null;
   created_at: string;
 }
