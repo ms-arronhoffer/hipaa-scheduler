@@ -21,7 +21,7 @@ export interface Patient {
   sex: string | null;
   email: string | null;
   phone: string | null;
-  address: PatientAddress;
+  address: PatientAddress | null;
   preferred_office_id: string | null;
   sms_opt_in_at: string | null;
   created_at: string;

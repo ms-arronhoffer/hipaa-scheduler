@@ -182,7 +182,7 @@ export default function PatientsPage() {
                       selectedOption={SEX_OPTIONS.find((o) => o.value === draft.sex) ?? null}
                       options={SEX_OPTIONS}
                       placeholder="Select"
-                      onChange={(e) => setDraft({ ...draft, sex: e.detail.selectedOption.value ?? null })}
+                      onChange={(e) => setDraft({ ...draft, sex: e.detail.selectedOption?.value ?? null })}
                     />
                   </FormField>
                 </ColumnLayout>
@@ -226,7 +226,7 @@ export default function PatientsPage() {
                   options={officeOptions}
                   placeholder="No preference"
                   empty="No offices configured"
-                  onChange={(e) => setDraft({ ...draft, preferred_office_id: e.detail.selectedOption.value ?? null })}
+                  onChange={(e) => setDraft({ ...draft, preferred_office_id: e.detail.selectedOption?.value ?? null })}
                 />
               </FormField>
             </Container>
