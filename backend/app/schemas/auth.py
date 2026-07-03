@@ -20,6 +20,17 @@ class TokenResponse(BaseModel):
     expires_in: int
 
 
+class CurrentUserOut(BaseModel):
+    id: uuid.UUID
+    email: str
+    first_name: str | None = None
+    last_name: str | None = None
+    roles: list[str] = Field(default_factory=list)
+    is_super_admin: bool = False
+    mfa_enrolled: bool = False
+    org_id: uuid.UUID | None = None
+
+
 class MfaChallenge(BaseModel):
     mfa_required: bool = True
     session_ticket: str  # short-lived one-time value the client returns with totp_code

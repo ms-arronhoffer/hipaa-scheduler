@@ -28,6 +28,7 @@ from app.models.activity_log import ActivityLog
 from app.models.user import AuthLockout, User
 from app.services import email_service, password_service
 from app.schemas.auth import (
+    CurrentUserOut,
     MfaBackupCodes,
     MfaEnrollStart,
     MfaEnrollVerify,
@@ -153,6 +154,26 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)) -> T
         audience="staff", subject=subj, org_id=org, extra={"mfa_ok": mfa_ok}
     )
     return TokenResponse(access_token=access, refresh_token=new_refresh, expires_in=jwt_service.ACCESS_TTL_MIN * 60)
+
+
+@router.get("/me", response_model=CurrentUserOut)
+async def me(
+    p: Principal = Depends(require_staff()),
+    db: AsyncSession = Depends(get_db),
+) -> CurrentUserOut:
+    """Return the authenticated staff user's profile for the current session."""
+    # idor-safe: scoped to the authenticated staff principal's own id (from JWT), not org.
+    user = (await db.execute(select(User).where(User.id == p.subject_id))).scalar_one()
+    return CurrentUserOut(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        roles=list(user.roles or []),
+        is_super_admin=bool(user.is_super_admin),
+        mfa_enrolled=bool(user.mfa_enrolled),
+        org_id=user.org_id,
+    )
 
 
 @router.post("/mfa/enroll/start", response_model=MfaEnrollStart)
