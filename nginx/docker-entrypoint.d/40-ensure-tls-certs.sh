@@ -48,7 +48,7 @@ ensure_cert() {
 if ! mkdir -p "$CERT_DIR" 2>/dev/null; then
   echo "[tls] $CERT_DIR is not writable; skipping self-signed cert generation" >&2
   echo "[tls] provide real certs or mount the certs directory read-write" >&2
-  return 0 2>/dev/null || exit 0
+  exit 0
 fi
 
 # server_name defaults from conf.d/*.conf (staff = default vhost).
