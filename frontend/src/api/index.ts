@@ -92,12 +92,30 @@ export const waitlistApi = {
   list: () => apiClient.get("/waitlist").then((r) => r.data),
 };
 
+// The backend router is mounted at /intake and serializes the form body under
+// the `schema` key (see IntakeFormOut). The staff UI models the same structure
+// as `definition`, so translate at the boundary to keep the pages unchanged.
+function toDefinition<T extends Record<string, unknown>>(row: T): T {
+  if (row && "schema" in row) {
+    const { schema, ...rest } = row as Record<string, unknown>;
+    return { ...rest, definition: schema } as unknown as T;
+  }
+  return row;
+}
+function toSchemaBody(body: unknown): unknown {
+  if (body && typeof body === "object" && "definition" in body) {
+    const { definition, ...rest } = body as Record<string, unknown>;
+    return { ...rest, schema: definition };
+  }
+  return body;
+}
 export const intakeFormsApi = {
-  list: () => apiClient.get("/intake-forms").then((r) => r.data),
-  get: (id: string) => apiClient.get(`/intake-forms/${id}`).then((r) => r.data),
-  create: (body: unknown) => apiClient.post("/intake-forms", body).then((r) => r.data),
+  list: () => apiClient.get("/intake/forms").then((r) => r.data),
+  get: (id: string) => apiClient.get(`/intake/forms/${id}`).then((r) => toDefinition(r.data)),
+  create: (body: unknown) =>
+    apiClient.post("/intake/forms", toSchemaBody(body)).then((r) => toDefinition(r.data)),
   update: (id: string, body: unknown) =>
-    apiClient.patch(`/intake-forms/${id}`, body).then((r) => r.data),
+    apiClient.patch(`/intake/forms/${id}`, toSchemaBody(body)).then((r) => toDefinition(r.data)),
 };
 
 export const apiKeysApi = {
@@ -115,10 +133,10 @@ export const webhooksApi = {
     apiClient.post("/webhooks", body).then((r) => r.data),
   update: (id: string, body: unknown) => apiClient.patch(`/webhooks/${id}`, body).then((r) => r.data),
   rotate: (id: string) =>
-    apiClient.post<{ secret: string }>(`/webhooks/${id}/rotate`).then((r) => r.data),
+    apiClient.post<{ secret: string }>(`/webhooks/${id}/rotate-secret`).then((r) => r.data),
   deliveries: (id: string) => apiClient.get(`/webhooks/${id}/deliveries`).then((r) => r.data),
-  retry: (id: string, delivery_id: string) =>
-    apiClient.post(`/webhooks/${id}/deliveries/${delivery_id}/retry`),
+  retry: (delivery_id: string) =>
+    apiClient.post(`/webhooks/deliveries/${delivery_id}/retry`),
 };
 
 export const calendarConnectionsApi = {
@@ -149,9 +167,23 @@ export const organizationApi = {
   update: (body: unknown) => apiClient.patch("/organization", body).then((r) => r.data),
 };
 
+// The backend reports router exposes date-bounded summaries keyed by
+// `range_start`/`range_end` (YYYY-MM-DD). Callers pass ISO timestamps, so
+// reduce them to the date portion the endpoint expects.
+function toDateRange(params: { from_ts?: string; to_ts?: string }): {
+  range_start?: string;
+  range_end?: string;
+} {
+  const out: { range_start?: string; range_end?: string } = {};
+  if (params.from_ts) out.range_start = params.from_ts.slice(0, 10);
+  if (params.to_ts) out.range_end = params.to_ts.slice(0, 10);
+  return out;
+}
 export const reportsApi = {
+  // NOTE: there is no `/reports/utilization` endpoint on the backend yet; this
+  // call is a known gap tracked separately, not an endpoint path mismatch.
   utilization: (params: { from_ts?: string; to_ts?: string } = {}) =>
     apiClient.get("/reports/utilization", { params }).then((r) => r.data),
   noShows: (params: { from_ts?: string; to_ts?: string } = {}) =>
-    apiClient.get("/reports/no-shows", { params }).then((r) => r.data),
+    apiClient.get("/reports/no-show", { params: toDateRange(params) }).then((r) => r.data),
 };
