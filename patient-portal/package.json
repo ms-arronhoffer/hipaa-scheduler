@@ -14,17 +14,17 @@
     "@cloudscape-design/global-styles": "^1.0.35",
     "axios": "^1.7.7",
     "date-fns": "^3.6.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
     "@types/node": "^20.16.11",
-    "@types/react": "^18.3.10",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.1",
-    "eslint": "^9.11.1",
-    "typescript": "^5.6.2",
+    "eslint": "^10.6.0",
+    "typescript": "^6.0.3",
     "vite": "^5.4.8"
   }
 }
