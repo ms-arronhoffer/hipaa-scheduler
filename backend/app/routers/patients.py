@@ -102,7 +102,7 @@ async def update_patient(
     return row
 
 
-@router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def soft_delete_patient(
     patient_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),

@@ -85,7 +85,7 @@ async def get_consent(
     return row
 
 
-@router.delete("/{consent_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{consent_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def revoke_consent(
     consent_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),

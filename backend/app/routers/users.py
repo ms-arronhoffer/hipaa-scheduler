@@ -134,7 +134,7 @@ async def update_user(
     return row
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_user(
     user_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),
@@ -169,7 +169,7 @@ async def _load_org_user(db: AsyncSession, user_id: uuid.UUID, org_id: uuid.UUID
     return row
 
 
-@router.post("/{user_id}/mfa/reset", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/{user_id}/mfa/reset", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def reset_user_mfa(
     user_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),
@@ -192,7 +192,7 @@ async def reset_user_mfa(
     ))
 
 
-@router.post("/{user_id}/sign-out-everywhere", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/{user_id}/sign-out-everywhere", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def sign_out_everywhere(
     user_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),

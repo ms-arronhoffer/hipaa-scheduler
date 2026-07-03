@@ -134,7 +134,7 @@ async def update_insurance(
     return row
 
 
-@router.delete("/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{policy_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_insurance(
     policy_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin", "billing")),

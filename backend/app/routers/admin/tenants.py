@@ -152,7 +152,7 @@ async def sign_baa(
     return row
 
 
-@router.delete("/{org_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{org_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_tenant(
     org_id: uuid.UUID,
     p: Principal = Depends(require_super_admin()),

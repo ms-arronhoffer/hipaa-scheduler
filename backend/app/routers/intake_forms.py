@@ -146,7 +146,7 @@ async def update_form(
     return row
 
 
-@router.delete("/forms/{form_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/forms/{form_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_form(
     form_id: uuid.UUID,
     p: Principal = Depends(require_role("practice_admin")),
