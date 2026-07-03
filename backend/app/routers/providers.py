@@ -22,13 +22,22 @@ router = APIRouter(prefix="/providers", tags=["providers"])
 async def list_providers(
     p: Principal = Depends(require_role("practice_admin", "front_desk", "provider", "billing")),
     db: AsyncSession = Depends(get_db),
-) -> list[ProviderProfile]:
+) -> list[ProviderOut]:
     rows = (await db.execute(
-        select(ProviderProfile).where(
+        select(ProviderProfile, User)
+        .join(User, User.id == ProviderProfile.user_id)
+        .where(
             ProviderProfile.org_id == p.org_id, ProviderProfile.deleted_at.is_(None)
         )
-    )).scalars().all()
-    return list(rows)
+    )).all()
+    out: list[ProviderOut] = []
+    for profile, user in rows:
+        item = ProviderOut.model_validate(profile)
+        full_name = " ".join(filter(None, [user.first_name, user.last_name]))
+        item.display_name = full_name or None
+        item.email = user.email
+        out.append(item)
+    return out
 
 
 @router.post("", response_model=ProviderOut, status_code=status.HTTP_201_CREATED)

@@ -66,3 +66,5 @@ class ProviderOut(ORMModel):
     default_office_id: uuid.UUID | None
     color: str | None
     bookable: bool
+    display_name: str | None = None
+    email: str | None = None

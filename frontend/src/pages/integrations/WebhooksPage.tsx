@@ -103,7 +103,7 @@ export default function WebhooksPage() {
   async function retry(delivery: Delivery) {
     if (!deliveriesFor) return;
     try {
-      await webhooksApi.retry(deliveriesFor.id, delivery.id);
+      await webhooksApi.retry(delivery.id);
       push({ type: "success", content: "Retry queued" });
       openDeliveries(deliveriesFor);
     } catch {

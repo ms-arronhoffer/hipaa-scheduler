@@ -121,11 +121,20 @@ export const adminApi = {
       .post<Tenant>(`/admin/plans/override`, { org_id, plan_id })
       .then((r) => r.data),
 
-  // Audit search (cross-tenant)
-  searchAudit: (params: AuditSearchParams) =>
-    apiClient
-      .get<{ items: AuditRow[]; total: number }>("/admin/audit-search", { params })
-      .then((r) => r.data),
+  // Audit search (cross-tenant). Backend route is /admin/audit/search and
+  // paginates with limit/offset; the UI thinks in page/page_size, so translate.
+  searchAudit: (params: AuditSearchParams) => {
+    const { page, page_size, ...rest } = params;
+    const size = page_size ?? 50;
+    const query = {
+      ...rest,
+      limit: size,
+      offset: page && page > 1 ? (page - 1) * size : 0,
+    };
+    return apiClient
+      .get<{ items: AuditRow[]; total: number }>("/admin/audit/search", { params: query })
+      .then((r) => r.data);
+  },
 
   // Impersonation
   impersonate: (org_id: string, user_id?: string, reason?: string) =>

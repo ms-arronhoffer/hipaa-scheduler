@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.principal import Principal
@@ -19,6 +19,7 @@ from app.models.office import Office
 from app.schemas.appointment import (
     AppointmentCancel,
     AppointmentCreate,
+    AppointmentListOut,
     AppointmentOut,
     AppointmentReschedule,
     SlotOut,
@@ -98,6 +99,51 @@ async def create_appointment(
         data={"appointment_id": str(appt.id), "start_at": appt.start_at.isoformat()},
     )
     return appt
+
+
+@router.get("", response_model=AppointmentListOut)
+async def list_appointments(
+    from_ts: datetime | None = None,
+    to_ts: datetime | None = None,
+    provider_id: uuid.UUID | None = None,
+    office_id: uuid.UUID | None = None,
+    status: str | None = None,
+    limit: int = Query(default=500, le=1000),
+    offset: int = 0,
+    p: Principal = Depends(require_role("practice_admin", "front_desk", "provider", "billing")),
+    db: AsyncSession = Depends(get_db),
+) -> AppointmentListOut:
+    """List appointments for the org, filtered by date range/provider/office/status.
+
+    Backs the calendar, appointments, dashboard, and patient-detail screens. The
+    ``start_at`` window is half-open ``[from_ts, to_ts)`` so day/week grids don't
+    double-count the boundary.
+    """
+    filters = [Appointment.org_id == p.org_id, Appointment.deleted_at.is_(None)]
+    if from_ts is not None:
+        filters.append(Appointment.start_at >= from_ts)
+    if to_ts is not None:
+        filters.append(Appointment.start_at < to_ts)
+    if provider_id is not None:
+        filters.append(Appointment.provider_id == provider_id)
+    if office_id is not None:
+        filters.append(Appointment.office_id == office_id)
+    if status is not None:
+        filters.append(Appointment.status == status)
+
+    total = (await db.execute(
+        select(func.count()).select_from(Appointment).where(*filters)
+    )).scalar_one()
+    rows = (await db.execute(
+        select(Appointment).where(*filters)
+        .order_by(Appointment.start_at.asc())
+        .limit(limit)
+        .offset(offset)
+    )).scalars().all()
+    return AppointmentListOut(
+        items=[AppointmentOut.model_validate(r) for r in rows],
+        total=total,
+    )
 
 
 @router.get("/{appointment_id}", response_model=AppointmentOut)
