@@ -142,7 +142,13 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/snippets:/etc/nginx/snippets:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
+      # Writable so the entrypoint below can drop self-signed fallback certs
+      # when real certs have not been provisioned; real certs are never
+      # overwritten.
+      - ./nginx/certs:/etc/nginx/certs
+      # Generates self-signed certs for any missing vhost pair before nginx
+      # starts, so the proxy (and its published ports) always comes up.
+      - ./nginx/docker-entrypoint.d/40-ensure-tls-certs.sh:/docker-entrypoint.d/40-ensure-tls-certs.sh:ro
       - nginx_logs:/var/log/nginx
     networks:
       - internal
