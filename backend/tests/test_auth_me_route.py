@@ -26,7 +26,7 @@ def _get_route(path: str, method: str):
 def test_auth_me_route_registered():
     route = _get_route("/auth/me", "GET")
     assert route is not None, "GET /auth/me must be registered on the auth router"
-    assert route.response_model is CurrentUserOut
+    assert route.response_model == CurrentUserOut
 
 
 def test_current_user_schema_fields():

@@ -163,7 +163,9 @@ async def me(
 ) -> CurrentUserOut:
     """Return the authenticated staff user's profile for the current session."""
     # idor-safe: scoped to the authenticated staff principal's own id (from JWT), not org.
-    user = (await db.execute(select(User).where(User.id == p.subject_id))).scalar_one()
+    user = (await db.execute(select(User).where(User.id == p.subject_id))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "user no longer exists")
     return CurrentUserOut(
         id=user.id,
         email=user.email,
