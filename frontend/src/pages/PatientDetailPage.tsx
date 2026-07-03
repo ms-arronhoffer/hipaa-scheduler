@@ -22,6 +22,17 @@ function Field({ label, value }: { label: string; value: string | null | undefin
   );
 }
 
+function formatAddress(address: Patient["address"]): string | null {
+  if (!address) return null;
+  const parts = [
+    address.line1,
+    address.line2,
+    [address.city, address.state].filter(Boolean).join(", "),
+    address.postal_code,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export default function PatientDetailPage() {
   const { id = "" } = useParams();
   const nav = useNavigate();
@@ -68,11 +79,15 @@ export default function PatientDetailPage() {
             content: (
               <Container header={<Header variant="h2">Demographics</Header>}>
                 <ColumnLayout columns={2} variant="text-grid">
+                  <Field label="MRN" value={patient.mrn} />
                   <Field label="First name" value={patient.first_name} />
+                  <Field label="Middle name" value={patient.middle_name} />
                   <Field label="Last name" value={patient.last_name} />
                   <Field label="Date of birth" value={patient.dob} />
+                  <Field label="Sex" value={patient.sex} />
                   <Field label="Email" value={patient.email} />
                   <Field label="Phone" value={patient.phone} />
+                  <Field label="Address" value={formatAddress(patient.address)} />
                   <Field label="SMS opted in" value={patient.sms_opt_in_at ? "Yes" : "No"} />
                 </ColumnLayout>
               </Container>

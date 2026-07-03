@@ -11,11 +11,26 @@ import Box from "@cloudscape-design/components/box";
 import Form from "@cloudscape-design/components/form";
 import FormField from "@cloudscape-design/components/form-field";
 import Input from "@cloudscape-design/components/input";
+import ColumnLayout from "@cloudscape-design/components/column-layout";
+import Container from "@cloudscape-design/components/container";
+import Select, { SelectProps } from "@cloudscape-design/components/select";
 import PageHeader from "../components/layout/PageHeader";
-import { Patient, patientsApi } from "../api";
+import { officesApi, Patient, PatientAddress, patientsApi } from "../api";
 import { useFlash } from "../context/FlashbarContext";
 
 const PAGE_SIZE = 25;
+
+const SEX_OPTIONS: SelectProps.Option[] = [
+  { label: "Female", value: "F" },
+  { label: "Male", value: "M" },
+  { label: "Other", value: "O" },
+  { label: "Unknown", value: "U" },
+];
+
+interface OfficeOption {
+  id: string;
+  name: string;
+}
 
 export default function PatientsPage() {
   const nav = useNavigate();
@@ -28,6 +43,7 @@ export default function PatientsPage() {
   const [showNew, setShowNew] = useState(false);
   const [draft, setDraft] = useState<Partial<Patient>>({});
   const [saving, setSaving] = useState(false);
+  const [offices, setOffices] = useState<OfficeOption[]>([]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -43,10 +59,31 @@ export default function PatientsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    officesApi
+      .list()
+      .then((r: unknown) => {
+        const rows = ((r as { items?: OfficeOption[] }).items ?? (r as OfficeOption[])) || [];
+        setOffices(rows.map((o) => ({ id: o.id, name: o.name })));
+      })
+      .catch(() => { /* office dropdown is optional; ignore load failures */ });
+  }, []);
+
   const pagesCount = useMemo(() => Math.max(1, Math.ceil(total / PAGE_SIZE)), [total]);
 
+  function updateAddress(patch: Partial<PatientAddress>) {
+    setDraft((d) => ({ ...d, address: { ...(d.address ?? {}), ...patch } }));
+  }
+
+  const officeOptions: SelectProps.Option[] = useMemo(
+    () => offices.map((o) => ({ label: o.name, value: o.id })),
+    [offices],
+  );
+
+  const canSubmit = Boolean(draft.mrn && draft.first_name && draft.last_name && draft.dob);
+
   async function submit() {
-    if (!draft.first_name || !draft.last_name) return;
+    if (!canSubmit) return;
     setSaving(true);
     try {
       const p = await patientsApi.create(draft);
@@ -108,32 +145,91 @@ export default function PatientsPage() {
         visible={showNew}
         onDismiss={() => setShowNew(false)}
         header="New patient"
+        size="large"
         footer={
           <Box float="right">
             <SpaceBetween direction="horizontal" size="xs">
               <Button onClick={() => setShowNew(false)}>Cancel</Button>
-              <Button variant="primary" loading={saving} onClick={submit}>Create</Button>
+              <Button variant="primary" loading={saving} disabled={!canSubmit} onClick={submit}>Create</Button>
             </SpaceBetween>
           </Box>
         }
       >
         <Form>
-          <SpaceBetween size="m">
-            <FormField label="First name">
-              <Input value={draft.first_name ?? ""} onChange={(e) => setDraft({ ...draft, first_name: e.detail.value })} />
-            </FormField>
-            <FormField label="Last name">
-              <Input value={draft.last_name ?? ""} onChange={(e) => setDraft({ ...draft, last_name: e.detail.value })} />
-            </FormField>
-            <FormField label="Date of birth" description="YYYY-MM-DD">
-              <Input value={draft.dob ?? ""} onChange={(e) => setDraft({ ...draft, dob: e.detail.value })} />
-            </FormField>
-            <FormField label="Email">
-              <Input type="email" value={draft.email ?? ""} onChange={(e) => setDraft({ ...draft, email: e.detail.value })} />
-            </FormField>
-            <FormField label="Phone">
-              <Input value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.detail.value })} />
-            </FormField>
+          <SpaceBetween size="l">
+            <Container header={<Header variant="h3">Identity</Header>}>
+              <SpaceBetween size="m">
+                <FormField label="MRN" description="Medical record number (required, unique per practice)">
+                  <Input value={draft.mrn ?? ""} onChange={(e) => setDraft({ ...draft, mrn: e.detail.value })} />
+                </FormField>
+                <ColumnLayout columns={3}>
+                  <FormField label="First name">
+                    <Input value={draft.first_name ?? ""} onChange={(e) => setDraft({ ...draft, first_name: e.detail.value })} />
+                  </FormField>
+                  <FormField label="Middle name">
+                    <Input value={draft.middle_name ?? ""} onChange={(e) => setDraft({ ...draft, middle_name: e.detail.value })} />
+                  </FormField>
+                  <FormField label="Last name">
+                    <Input value={draft.last_name ?? ""} onChange={(e) => setDraft({ ...draft, last_name: e.detail.value })} />
+                  </FormField>
+                </ColumnLayout>
+                <ColumnLayout columns={2}>
+                  <FormField label="Date of birth" description="YYYY-MM-DD">
+                    <Input value={draft.dob ?? ""} onChange={(e) => setDraft({ ...draft, dob: e.detail.value })} />
+                  </FormField>
+                  <FormField label="Sex">
+                    <Select
+                      selectedOption={SEX_OPTIONS.find((o) => o.value === draft.sex) ?? null}
+                      options={SEX_OPTIONS}
+                      placeholder="Select"
+                      onChange={(e) => setDraft({ ...draft, sex: e.detail.selectedOption.value ?? null })}
+                    />
+                  </FormField>
+                </ColumnLayout>
+              </SpaceBetween>
+            </Container>
+
+            <Container header={<Header variant="h3">Contact</Header>}>
+              <SpaceBetween size="m">
+                <ColumnLayout columns={2}>
+                  <FormField label="Email">
+                    <Input type="email" value={draft.email ?? ""} onChange={(e) => setDraft({ ...draft, email: e.detail.value })} />
+                  </FormField>
+                  <FormField label="Phone">
+                    <Input value={draft.phone ?? ""} onChange={(e) => setDraft({ ...draft, phone: e.detail.value })} />
+                  </FormField>
+                </ColumnLayout>
+                <FormField label="Address line 1">
+                  <Input value={draft.address?.line1 ?? ""} onChange={(e) => updateAddress({ line1: e.detail.value })} />
+                </FormField>
+                <FormField label="Address line 2">
+                  <Input value={draft.address?.line2 ?? ""} onChange={(e) => updateAddress({ line2: e.detail.value })} />
+                </FormField>
+                <ColumnLayout columns={3}>
+                  <FormField label="City">
+                    <Input value={draft.address?.city ?? ""} onChange={(e) => updateAddress({ city: e.detail.value })} />
+                  </FormField>
+                  <FormField label="State">
+                    <Input value={draft.address?.state ?? ""} onChange={(e) => updateAddress({ state: e.detail.value })} />
+                  </FormField>
+                  <FormField label="Postal code">
+                    <Input value={draft.address?.postal_code ?? ""} onChange={(e) => updateAddress({ postal_code: e.detail.value })} />
+                  </FormField>
+                </ColumnLayout>
+              </SpaceBetween>
+            </Container>
+
+            <Container header={<Header variant="h3">Care preferences</Header>}>
+              <FormField label="Preferred office">
+                <Select
+                  selectedOption={officeOptions.find((o) => o.value === draft.preferred_office_id) ?? null}
+                  options={officeOptions}
+                  placeholder="No preference"
+                  empty="No offices configured"
+                  onChange={(e) => setDraft({ ...draft, preferred_office_id: e.detail.selectedOption.value ?? null })}
+                />
+              </FormField>
+            </Container>
           </SpaceBetween>
         </Form>
       </Modal>
