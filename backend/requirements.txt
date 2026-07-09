@@ -24,7 +24,7 @@ boto3==1.35.34
 twilio==9.3.3
 sendgrid==6.11.0
 hypothesis==6.115.0
-pytest==8.4.2
+pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 factory-boy==3.3.1
