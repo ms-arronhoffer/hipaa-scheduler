@@ -11,7 +11,7 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@cloudscape-design/components": "^3.0.850",
+    "@cloudscape-design/components": "^3.0.1324",
     "@cloudscape-design/global-styles": "^1.0.35",
     "axios": "^1.7.7",
     "react": "^18.3.1",
